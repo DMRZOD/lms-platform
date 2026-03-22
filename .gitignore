@@ -1,0 +1,56 @@
+# Зависимости
+node_modules
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# Сборка Next.js
+.next
+out
+build
+dist
+
+# Тесты и покрытие
+coverage
+.nyc_output
+
+# Окружение (оставьте .env.example в репозитории как шаблон)
+.env*
+!.env.example
+
+# Vercel
+.vercel
+
+# Логи и отладка
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+# TypeScript
+*.tsbuildinfo
+
+# ESLint
+.eslintcache
+
+# Prettier
+.prettiercache
+
+# ОС
+.DS_Store
+Thumbs.db
+
+# IDE и редакторы
+.idea
+*.swp
+*.swo
+*~
+
+# Прочее
+*.pem
+.turbo
