@@ -113,17 +113,26 @@ export const roleConfigs: Record<string, RoleConfig> = {
   academic: {
     role: "academic",
     label: "Academic Department",
-    description: "Manage schedules, groups, and academic processes",
+    description: "Manage programs, groups, schedules, and academic processes",
     navItems: [
       {
         label: "Dashboard",
         href: "/academic/dashboard",
         icon: LayoutDashboard,
       },
-      { label: "Schedule", href: "/academic/schedule", icon: Calendar },
+      { label: "Programs", href: "/academic/programs", icon: BookOpen },
       { label: "Groups", href: "/academic/groups", icon: Users },
-      { label: "Performance", href: "/academic/performance", icon: BarChart3 },
+      { label: "Schedules", href: "/academic/schedules", icon: Calendar },
       { label: "Admissions", href: "/academic/admissions", icon: UserCheck },
+      {
+        label: "Exam Eligibility",
+        href: "/academic/exam-eligibility",
+        icon: ClipboardCheck,
+      },
+      { label: "Exceptions", href: "/academic/exceptions", icon: AlertCircle },
+      { label: "Performance", href: "/academic/performance", icon: BarChart3 },
+      { label: "Coordination", href: "/academic/coordination", icon: Link2 },
+      { label: "Settings", href: "/academic/settings", icon: Settings },
     ],
   },
   aqad: {
