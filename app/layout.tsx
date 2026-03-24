@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Sora } from "next/font/google";
 
 import "@/styles/globals.css";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 const sora = Sora({
   variable: "--font-sora",
@@ -27,7 +28,9 @@ type RootLayoutProps = {
 const RootLayout = ({ children }: Readonly<RootLayoutProps>) => {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${sora.variable} antialiased`}>{children}</body>
+      <body className={`${sora.variable} antialiased`}>
+        <TooltipProvider>{children}</TooltipProvider>
+      </body>
     </html>
   );
 };
