@@ -3,6 +3,7 @@ import {
   Activity,
   AlertCircle,
   ArrowLeftRight,
+  Ban,
   BarChart3,
   Bell,
   BookMarked,
@@ -189,17 +190,26 @@ export const roleConfigs: Record<string, RoleConfig> = {
   accountant: {
     role: "accountant",
     label: "Finance",
-    description: "Payments, debts, and financial reports",
+    description: "Contracts, payments, debts, and financial reports",
     navItems: [
       {
         label: "Dashboard",
         href: "/accountant/dashboard",
         icon: LayoutDashboard,
       },
+      { label: "Contracts", href: "/accountant/contracts", icon: FileText },
       { label: "Payments", href: "/accountant/payments", icon: CreditCard },
+      {
+        label: "Reconciliation",
+        href: "/accountant/reconciliation",
+        icon: ArrowLeftRight,
+      },
       { label: "Debts", href: "/accountant/debts", icon: DollarSign },
+      { label: "Blocking", href: "/accountant/blocking", icon: Ban },
       { label: "Reports", href: "/accountant/reports", icon: FileBarChart },
+      { label: "Analytics", href: "/accountant/analytics", icon: BarChart3 },
       { label: "Audit", href: "/accountant/audit", icon: ScrollText },
+      { label: "Settings", href: "/accountant/settings", icon: Settings },
     ],
   },
   deputy: {
