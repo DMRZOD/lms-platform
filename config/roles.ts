@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Activity,
   AlertCircle,
+  ArrowLeftRight,
   BarChart3,
   Bell,
   BookMarked,
@@ -164,7 +165,7 @@ export const roleConfigs: Record<string, RoleConfig> = {
   resource: {
     role: "resource",
     label: "Resource Department",
-    description: "Manage teachers and resource allocation",
+    description: "Manage teachers, assignments, and workload",
     navItems: [
       {
         label: "Dashboard",
@@ -174,6 +175,15 @@ export const roleConfigs: Record<string, RoleConfig> = {
       { label: "Teachers", href: "/resource/teachers", icon: Users },
       { label: "Assignments", href: "/resource/assignments", icon: Briefcase },
       { label: "Workload", href: "/resource/workload", icon: BarChart3 },
+      { label: "Performance", href: "/resource/performance", icon: TrendingUp },
+      {
+        label: "Replacements",
+        href: "/resource/replacements",
+        icon: ArrowLeftRight,
+      },
+      { label: "Access", href: "/resource/access", icon: KeyRound },
+      { label: "Reports", href: "/resource/reports", icon: FileBarChart },
+      { label: "Settings", href: "/resource/settings", icon: Settings },
     ],
   },
   accountant: {
