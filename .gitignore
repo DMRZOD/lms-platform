@@ -54,4 +54,7 @@ Thumbs.db
 # Прочее
 *.pem
 .turbo
+
+# Claude 
 CLAUDE.md
+.claude
