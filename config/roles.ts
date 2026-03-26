@@ -21,6 +21,7 @@ import {
   FileBarChart,
   FileText,
   Flame,
+  Gauge,
   GitCompare,
   GraduationCap,
   KeyRound,
@@ -31,7 +32,6 @@ import {
   MessageSquare,
   MessageSquareWarning,
   PenSquare,
-  Rocket,
   Scale,
   ScrollText,
   Settings,
@@ -44,6 +44,7 @@ import {
   Users,
   Video,
   Wallet,
+  Wrench,
 } from "lucide-react";
 
 export type Role =
@@ -259,13 +260,21 @@ export const roleConfigs: Record<string, RoleConfig> = {
   "it-ops": {
     role: "it-ops",
     label: "IT Operations",
-    description: "Monitoring, releases, and system operations",
+    description: "Infrastructure, monitoring, and system operations",
     navItems: [
       { label: "Dashboard", href: "/it-ops/dashboard", icon: LayoutDashboard },
       { label: "Monitoring", href: "/it-ops/monitoring", icon: Activity },
-      { label: "Releases", href: "/it-ops/releases", icon: Rocket },
-      { label: "Access", href: "/it-ops/access", icon: KeyRound },
+      { label: "Integrations", href: "/it-ops/integrations", icon: Link2 },
+      { label: "Incidents", href: "/it-ops/incidents", icon: Flame },
+      { label: "Security", href: "/it-ops/security", icon: ShieldAlert },
       { label: "Backups", href: "/it-ops/backups", icon: Database },
+      { label: "Performance", href: "/it-ops/performance", icon: Gauge },
+      { label: "Access", href: "/it-ops/access", icon: KeyRound },
+      { label: "Compliance", href: "/it-ops/compliance", icon: ClipboardCheck },
+      { label: "Capacity", href: "/it-ops/capacity", icon: BarChart3 },
+      { label: "Maintenance", href: "/it-ops/maintenance", icon: Wrench },
+      { label: "Reports", href: "/it-ops/reports", icon: FileBarChart },
+      { label: "Settings", href: "/it-ops/settings", icon: Settings },
     ],
   },
 };
