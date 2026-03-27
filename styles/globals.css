@@ -10,7 +10,17 @@
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
 
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-destructive: var(--destructive);
+
   --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
 
   --font-sans: var(--font-sora);
   --font-mono: ui-monospace, monospace;
@@ -29,7 +39,17 @@
   --secondary: #f4f4f4;
   --secondary-foreground: #8d8e8e;
 
+  --accent: #efefef;
+  --accent-foreground: #1c1d1d;
+
+  --muted: #f4f4f4;
+  --muted-foreground: #8d8e8e;
+
+  --destructive: #dc2626;
+
   --border: #e3e3e3;
+  --input: #e3e3e3;
+  --ring: #1c1d1d;
 
   --radius-md: 16px;
   --radius-sm: 8px;
@@ -56,6 +76,11 @@
   :focus-visible {
     outline: 1px dashed var(--foreground);
     outline-offset: 2px;
+  }
+
+  button,
+  [role="button"] {
+    cursor: pointer;
   }
 }
 

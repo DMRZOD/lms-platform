@@ -13,7 +13,7 @@ function Accordion({
   return (
     <AccordionPrimitive.Root
       data-slot="accordion"
-      className={cn("w-full", className)}
+      className={cn("w-full space-y-2", className)}
       {...props}
     />
   );
