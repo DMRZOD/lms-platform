@@ -2,33 +2,76 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useRef, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Eye, EyeOff } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+type AuthStep = "login" | "register" | "verify" | "success";
+
 function AuthContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [isRegister, setIsRegister] = useState(
-    searchParams.get("tab") === "register",
+  const [step, setStep] = useState<AuthStep>(
+    searchParams.get("tab") === "register" ? "register" : "login",
   );
   const [showPassword, setShowPassword] = useState(false);
+  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
+  const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
-    setIsRegister(searchParams.get("tab") === "register");
+    const tab = searchParams.get("tab");
+    if (tab === "register") {
+      setStep("register");
+    } else if (!tab) {
+      setStep((prev) =>
+        prev === "verify" || prev === "success" ? prev : "login",
+      );
+    }
   }, [searchParams]);
 
   const toggleRegister = () => {
-    if (isRegister) {
-      router.replace("/auth");
-    } else {
+    if (step === "login") {
       router.replace("/auth?tab=register");
+    } else {
+      router.replace("/auth");
     }
+  };
+
+  const handleOtpChange = (index: number, value: string) => {
+    if (!/^\d*$/.test(value)) return;
+    const next = [...otp];
+    next[index] = value.slice(-1);
+    setOtp(next);
+    if (value && index < 5) {
+      otpRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleOtpKeyDown = (
+    index: number,
+    e: React.KeyboardEvent<HTMLInputElement>,
+  ) => {
+    if (e.key === "Backspace" && !otp[index] && index > 0) {
+      otpRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleOtpPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    if (!pasted) return;
+    const next = [...otp];
+    pasted.split("").forEach((char, i) => {
+      next[i] = char;
+    });
+    setOtp(next);
+    const focusIndex = Math.min(pasted.length, 5);
+    otpRefs.current[focusIndex]?.focus();
   };
 
   return (
@@ -108,24 +151,96 @@ function AuthContent() {
           </div>
 
           <AnimatePresence mode="wait">
-            <motion.div
-              key={isRegister ? "register" : "login"}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.25 }}
-            >
-              <h1 className="mb-2 text-2xl font-bold text-foreground">
-                {isRegister ? "Create your account" : "Welcome back"}
-              </h1>
-              <p className="mb-8 text-sm text-secondary-foreground">
-                {isRegister
-                  ? "Start your learning journey today"
-                  : "Sign in to continue learning"}
-              </p>
+            {/* Login */}
+            {step === "login" && (
+              <motion.div
+                key="login"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.25 }}
+              >
+                <h1 className="mb-2 text-2xl font-bold text-foreground">
+                  Welcome back
+                </h1>
+                <p className="mb-8 text-sm text-secondary-foreground">
+                  Sign in to continue learning
+                </p>
 
-              <form onSubmit={(e) => e.preventDefault()} className="space-y-5">
-                {isRegister && (
+                <form onSubmit={(e) => e.preventDefault()} className="space-y-5">
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="you@example.com"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Password</Label>
+                    <div className="relative">
+                      <Input
+                        id="password"
+                        type={showPassword ? "text" : "password"}
+                        placeholder="••••••••"
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute top-1/2 right-3 -translate-y-1/2 text-secondary-foreground transition-colors hover:text-foreground"
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <Button className="w-full" size="lg">
+                    Sign In
+                  </Button>
+                </form>
+
+                <p className="mt-8 text-center text-sm text-secondary-foreground">
+                  Don&apos;t have an account?{" "}
+                  <button
+                    type="button"
+                    onClick={toggleRegister}
+                    className="font-medium text-foreground underline-offset-4 hover:underline cursor-pointer"
+                  >
+                    Create one
+                  </button>
+                </p>
+              </motion.div>
+            )}
+
+            {/* Register */}
+            {step === "register" && (
+              <motion.div
+                key="register"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.25 }}
+              >
+                <h1 className="mb-2 text-2xl font-bold text-foreground">
+                  Create your account
+                </h1>
+                <p className="mb-8 text-sm text-secondary-foreground">
+                  Start your learning journey today
+                </p>
+
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    setStep("verify");
+                  }}
+                  className="space-y-5"
+                >
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="firstName">First name</Label>
@@ -136,41 +251,39 @@ function AuthContent() {
                       <Input id="lastName" placeholder="Doe" />
                     </div>
                   </div>
-                )}
 
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="you@example.com"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <div className="relative">
+                  <div className="space-y-2">
+                    <Label htmlFor="reg-email">Email</Label>
                     <Input
-                      id="password"
-                      type={showPassword ? "text" : "password"}
-                      placeholder="••••••••"
-                      className="pr-10"
+                      id="reg-email"
+                      type="email"
+                      placeholder="you@example.com"
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute top-1/2 right-3 -translate-y-1/2 text-secondary-foreground transition-colors hover:text-foreground"
-                    >
-                      {showPassword ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </button>
                   </div>
-                </div>
 
-                {isRegister && (
+                  <div className="space-y-2">
+                    <Label htmlFor="reg-password">Password</Label>
+                    <div className="relative">
+                      <Input
+                        id="reg-password"
+                        type={showPassword ? "text" : "password"}
+                        placeholder="••••••••"
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute top-1/2 right-3 -translate-y-1/2 text-secondary-foreground transition-colors hover:text-foreground"
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="confirmPassword">Confirm password</Label>
                     <Input
@@ -179,26 +292,121 @@ function AuthContent() {
                       placeholder="••••••••"
                     />
                   </div>
-                )}
 
-                <Button className="w-full" size="lg">
-                  {isRegister ? "Create Account" : "Sign In"}
-                </Button>
-              </form>
+                  <Button className="w-full" size="lg">
+                    Create Account
+                  </Button>
+                </form>
 
-              <p className="mt-8 text-center text-sm text-secondary-foreground">
-                {isRegister
-                  ? "Already have an account?"
-                  : "Don't have an account?"}{" "}
-                <button
-                  type="button"
-                  onClick={toggleRegister}
-                  className="font-medium text-foreground underline-offset-4 hover:underline cursor-pointer"
+                <p className="mt-8 text-center text-sm text-secondary-foreground">
+                  Already have an account?{" "}
+                  <button
+                    type="button"
+                    onClick={toggleRegister}
+                    className="font-medium text-foreground underline-offset-4 hover:underline cursor-pointer"
+                  >
+                    Sign in
+                  </button>
+                </p>
+              </motion.div>
+            )}
+
+            {/* OTP Verify */}
+            {step === "verify" && (
+              <motion.div
+                key="verify"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.25 }}
+              >
+                <h1 className="mb-2 text-2xl font-bold text-foreground">
+                  Check your email
+                </h1>
+                <p className="mb-8 text-sm text-secondary-foreground">
+                  We sent a 6-digit verification code to your email address.
+                  Enter it below to verify your account.
+                </p>
+
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    setStep("success");
+                  }}
+                  className="space-y-6"
                 >
-                  {isRegister ? "Sign in" : "Create one"}
-                </button>
-              </p>
-            </motion.div>
+                  <div className="space-y-2">
+                    <Label>Verification code</Label>
+                    <div className="flex gap-3">
+                      {otp.map((digit, i) => (
+                        <input
+                          key={i}
+                          ref={(el) => {
+                            otpRefs.current[i] = el;
+                          }}
+                          type="text"
+                          inputMode="numeric"
+                          maxLength={1}
+                          value={digit}
+                          onChange={(e) => handleOtpChange(i, e.target.value)}
+                          onKeyDown={(e) => handleOtpKeyDown(i, e)}
+                          onPaste={i === 0 ? handleOtpPaste : undefined}
+                          className="h-12 w-12 rounded-md border border-input bg-background text-center text-lg font-semibold text-foreground shadow-xs outline-none transition-[color,box-shadow] focus:border-ring focus:ring-[3px] focus:ring-ring/50"
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <Button className="w-full" size="lg">
+                    Verify Email
+                  </Button>
+                </form>
+
+                <p className="mt-6 text-center text-sm text-secondary-foreground">
+                  Didn&apos;t receive the code?{" "}
+                  <button
+                    type="button"
+                    onClick={() => setOtp(["", "", "", "", "", ""])}
+                    className="font-medium text-foreground underline-offset-4 hover:underline cursor-pointer"
+                  >
+                    Resend code
+                  </button>
+                </p>
+              </motion.div>
+            )}
+
+            {/* Success */}
+            {step === "success" && (
+              <motion.div
+                key="success"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.25 }}
+                className="text-center"
+              >
+                <div className="mb-6 flex justify-center">
+                  <CheckCircle2 className="h-16 w-16 text-green-500" />
+                </div>
+                <h1 className="mb-2 text-2xl font-bold text-foreground">
+                  Email verified!
+                </h1>
+                <p className="mb-8 text-sm text-secondary-foreground">
+                  Your account has been created successfully. You can now sign
+                  in with your credentials.
+                </p>
+                <Button
+                  className="w-full"
+                  size="lg"
+                  onClick={() => {
+                    setStep("login");
+                    router.replace("/auth");
+                  }}
+                >
+                  Go to Login
+                </Button>
+              </motion.div>
+            )}
           </AnimatePresence>
         </div>
       </div>
