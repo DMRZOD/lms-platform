@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { ClipboardList, Plus, UserCheck } from "lucide-react";
 import Link from "next/link";
 import { EmptyState } from "@/components/aqad/empty-state";
@@ -9,235 +9,210 @@ import { PriorityBadge } from "@/components/aqad/priority-badge";
 import { StatCard } from "@/components/aqad/stat-card";
 import { StatusBadge } from "@/components/aqad/status-badge";
 import { PageHeader } from "@/components/platform/page-header";
-import { mockAQADMembers, mockCoursesForReview } from "@/constants/aqad-mock-data";
+import { apiClient } from "@/lib/api-client";
 import type { Priority } from "@/types/aqad";
 
-const FILTERS = [
-  { label: "All", value: "all" },
-  { label: "High Priority", value: "High" },
-  { label: "Medium Priority", value: "Medium" },
-  { label: "Low Priority", value: "Low" },
-  { label: "Initial", value: "Initial" },
-  { label: "Resubmission", value: "Resubmission" },
-  { label: "Re-Approval", value: "ReApproval" },
-];
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-function formatDate(ts: string) {
-  return new Date(ts).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+interface ApiReview {
+  id: number;
+  courseId: number;
+  courseTitle: string;
+  reviewerId: number;
+  reviewerName: string;
+  status: string;
+  checklist: {
+    learningoutcomesDefined: boolean;
+    assessmentAlignedWithOutcomes: boolean;
+    materialsUploaded: boolean;
+    gradingWeightsDefined: boolean;
+    attendancePolicyDefined: boolean;
+    academicIntegrityStatementPresent: boolean;
+  };
+  createdAt: string;
+  closedAt: string | null;
+  decision: {
+    id: number;
+    decisionType: string;
+    reasonCode: string;
+    notes: string;
+    conditions: string[];
+    deadline: string;
+    adminOverride: boolean;
+  } | null;
 }
+
+interface PagedResponse<T> {
+  content: T[];
+  totalElements: number;
+  totalPages: number;
+  size: number;
+}
+
+const FILTERS = [
+  { label: "All",          value: "all" },
+  { label: "Open",         value: "OPEN" },
+  { label: "In Progress",  value: "IN_PROGRESS" },
+  { label: "Closed",       value: "CLOSED" },
+];
 
 const SLA_THRESHOLD = 7;
 
-export default function ReviewQueuePage() {
-  const [activeFilter, setActiveFilter] = useState("all");
-  const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState<string[]>([]);
-  const [assigningId, setAssigningId] = useState<string | null>(null);
+function formatDate(ts: string) {
+  return new Date(ts).toLocaleDateString("en-US", {
+    month: "short", day: "numeric", year: "numeric",
+  });
+}
 
-  const filtered = mockCoursesForReview.filter((c) => {
-    const matchesFilter =
-      activeFilter === "all" ||
-      c.priority === activeFilter ||
-      c.reviewType === activeFilter;
+function getDaysInQueue(createdAt: string): number {
+  return Math.floor((Date.now() - new Date(createdAt).getTime()) / 86400000);
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+export default function ReviewQueuePage() {
+  const [reviews, setReviews]         = useState<ApiReview[]>([]);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState<string | null>(null);
+  const [activeFilter, setActiveFilter] = useState("all");
+  const [search, setSearch]           = useState("");
+
+  const fetchQueue = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await apiClient.get<PagedResponse<ApiReview>>(
+          "/api/v1/aqad/reviews/queue?page=0&size=100"
+      );
+      const arr = Array.isArray(data)
+          ? data
+          : (data as PagedResponse<ApiReview>).content ?? [];
+      setReviews(arr);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to load review queue");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchQueue(); }, [fetchQueue]);
+
+  const filtered = reviews.filter((r) => {
+    const matchesFilter = activeFilter === "all" || r.status === activeFilter;
     const matchesSearch =
-      c.title.toLowerCase().includes(search.toLowerCase()) ||
-      c.code.toLowerCase().includes(search.toLowerCase()) ||
-      c.teacherName.toLowerCase().includes(search.toLowerCase());
+        r.courseTitle.toLowerCase().includes(search.toLowerCase()) ||
+        r.reviewerName?.toLowerCase().includes(search.toLowerCase());
     return matchesFilter && matchesSearch;
   });
 
-  const highCount = mockCoursesForReview.filter((c) => c.priority === "High").length;
-  const unassignedCount = mockCoursesForReview.filter((c) => !c.assignedReviewerId).length;
-  const overSLA = mockCoursesForReview.filter((c) => c.daysInQueue >= SLA_THRESHOLD).length;
+  const openCount       = reviews.filter((r) => r.status === "OPEN").length;
+  const unassignedCount = reviews.filter((r) => !r.reviewerId).length;
+  const overSLA         = reviews.filter((r) => getDaysInQueue(r.createdAt) >= SLA_THRESHOLD).length;
 
-  function toggleSelect(id: string) {
-    setSelected((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+  if (error) {
+    return (
+        <div className="flex flex-col items-center justify-center py-20 gap-3">
+          <p className="text-sm text-red-500">{error}</p>
+          <button onClick={fetchQueue} className="rounded-md border border-border px-4 py-2 text-sm hover:bg-secondary">
+            Retry
+          </button>
+        </div>
     );
   }
 
-  function selectAll() {
-    setSelected(filtered.map((c) => c.id));
-  }
-
-  function clearSelection() {
-    setSelected([]);
-  }
-
   return (
-    <div>
-      <div className="mb-6 flex items-start justify-between">
-        <PageHeader
-          title="Review Queue"
-          description={`${mockCoursesForReview.length} courses awaiting AQAD review`}
-        />
-      </div>
-
-      {/* Stats */}
-      <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-        <StatCard
-          label="Total in Queue"
-          value={mockCoursesForReview.length}
-          icon={ClipboardList}
-          subtitle="Awaiting review"
-        />
-        <StatCard
-          label="High Priority"
-          value={highCount}
-          icon={ClipboardList}
-          subtitle="Need urgent attention"
-          accent={highCount > 3 ? "danger" : "warning"}
-        />
-        <StatCard
-          label="Unassigned"
-          value={unassignedCount}
-          icon={UserCheck}
-          subtitle="No reviewer assigned"
-          accent={unassignedCount > 0 ? "warning" : "default"}
-        />
-        <StatCard
-          label="Over SLA"
-          value={overSLA}
-          icon={ClipboardList}
-          subtitle={`>${SLA_THRESHOLD} days in queue`}
-          accent={overSLA > 0 ? "danger" : "default"}
-        />
-      </div>
-
-      {/* Bulk toolbar */}
-      {selected.length > 0 && (
-        <div className="mb-4 flex items-center gap-3 rounded-lg border bg-secondary px-4 py-2">
-          <span className="text-sm font-medium">{selected.length} selected</span>
-          <select className="rounded-md border border-border bg-background px-3 py-1 text-sm focus:outline-none">
-            <option value="">Assign reviewer…</option>
-            {mockAQADMembers.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name} ({m.activeReviews} active)
-              </option>
-            ))}
-          </select>
-          <button className="rounded-md bg-foreground px-3 py-1 text-sm text-background hover:opacity-90">
-            Assign
-          </button>
-          <button
-            onClick={clearSelection}
-            className="ml-auto text-sm text-secondary-foreground hover:text-foreground"
-          >
-            Clear selection
-          </button>
+      <div>
+        <div className="mb-6 flex items-start justify-between">
+          <PageHeader
+              title="Review Queue"
+              description={`${reviews.length} courses awaiting AQAD review`}
+          />
         </div>
-      )}
 
-      <FilterBar
-        filters={FILTERS}
-        activeFilter={activeFilter}
-        onFilterChange={setActiveFilter}
-        searchValue={search}
-        onSearchChange={setSearch}
-        placeholder="Search by course, code, teacher…"
-      />
+        <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
+          <StatCard label="Total in Queue" value={loading ? "—" : String(reviews.length)} icon={ClipboardList} subtitle="Awaiting review" />
+          <StatCard label="Open"           value={loading ? "—" : String(openCount)}       icon={ClipboardList} subtitle="Not yet started" accent={openCount > 3 ? "danger" : "warning"} />
+          <StatCard label="Unassigned"     value={loading ? "—" : String(unassignedCount)} icon={UserCheck}     subtitle="No reviewer assigned" accent={unassignedCount > 0 ? "warning" : "default"} />
+          <StatCard label="Over SLA"       value={loading ? "—" : String(overSLA)}         icon={ClipboardList} subtitle={`>${SLA_THRESHOLD} days in queue`} accent={overSLA > 0 ? "danger" : "default"} />
+        </div>
 
-      {filtered.length === 0 ? (
-        <EmptyState
-          icon={ClipboardList}
-          title="No courses found"
-          description="Try adjusting your filters or search term."
+        <FilterBar
+            filters={FILTERS}
+            activeFilter={activeFilter}
+            onFilterChange={setActiveFilter}
+            searchValue={search}
+            onSearchChange={setSearch}
+            placeholder="Search by course or reviewer…"
         />
-      ) : (
-        <div className="overflow-hidden rounded-lg border">
-          {/* Table header */}
-          <div className="grid grid-cols-[auto_1fr_auto_auto_auto_auto_auto] items-center gap-3 border-b bg-secondary px-4 py-2.5 text-xs font-medium text-secondary-foreground">
-            <input
-              type="checkbox"
-              checked={selected.length === filtered.length}
-              onChange={() =>
-                selected.length === filtered.length ? clearSelection() : selectAll()
-              }
-              className="rounded"
-            />
-            <span>Course</span>
-            <span>Submitted</span>
-            <span>Type</span>
-            <span>Priority</span>
-            <span>Reviewer</span>
-            <span>Actions</span>
-          </div>
 
-          {/* Rows */}
-          {filtered.map((course) => (
-            <div
-              key={course.id}
-              className="grid grid-cols-[auto_1fr_auto_auto_auto_auto_auto] items-center gap-3 border-b px-4 py-3 last:border-b-0 hover:bg-secondary/50"
-            >
-              <input
-                type="checkbox"
-                checked={selected.includes(course.id)}
-                onChange={() => toggleSelect(course.id)}
-                className="rounded"
-              />
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">{course.title}</p>
-                <p className="text-xs text-secondary-foreground">
-                  {course.code} · {course.teacherName} · {course.programName}
-                </p>
-                {course.daysInQueue >= SLA_THRESHOLD && (
-                  <span className="mt-0.5 inline-flex items-center rounded-full bg-[#fee2e2] px-2 py-0.5 text-xs text-[#dc2626]">
-                    SLA exceeded
-                  </span>
-                )}
-              </div>
-              <span className="text-xs text-secondary-foreground whitespace-nowrap">
-                {formatDate(course.submittedAt)}
-                <br />
-                <span className="text-secondary-foreground">{course.daysInQueue}d ago</span>
-              </span>
-              <StatusBadge status={course.reviewType} />
-              <PriorityBadge priority={course.priority as Priority} />
-              <div className="min-w-[120px]">
-                {assigningId === course.id ? (
-                  <select
-                    autoFocus
-                    onBlur={() => setAssigningId(null)}
-                    className="w-full rounded-md border border-border bg-background px-2 py-1 text-xs focus:outline-none"
-                  >
-                    <option value="">Select reviewer…</option>
-                    {mockAQADMembers.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name}
-                      </option>
-                    ))}
-                  </select>
-                ) : course.assignedReviewerName ? (
-                  <button
-                    onClick={() => setAssigningId(course.id)}
-                    className="text-xs hover:underline"
-                  >
-                    {course.assignedReviewerName}
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => setAssigningId(course.id)}
-                    className="flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-secondary"
-                  >
-                    <Plus className="h-3 w-3" />
-                    Assign
-                  </button>
-                )}
-              </div>
-              <Link
-                href={`/aqad/review/${course.id}`}
-                className="rounded-md bg-foreground px-3 py-1 text-xs text-background hover:opacity-90 whitespace-nowrap"
-              >
-                Start Review
-              </Link>
+        {loading ? (
+            <div className="space-y-3">
+              {[...Array(5)].map((_, i) => (
+                  <div key={i} className="h-16 animate-pulse rounded-lg bg-secondary" />
+              ))}
             </div>
-          ))}
-        </div>
-      )}
-    </div>
+        ) : filtered.length === 0 ? (
+            <EmptyState
+                icon={ClipboardList}
+                title="No courses found"
+                description="Try adjusting your filters or search term."
+            />
+        ) : (
+            <div className="overflow-hidden rounded-lg border">
+              {/* Header */}
+              <div className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-3 border-b bg-secondary px-4 py-2.5 text-xs font-medium text-secondary-foreground">
+                <span>Course</span>
+                <span>Submitted</span>
+                <span>Status</span>
+                <span>Reviewer</span>
+                <span>Actions</span>
+              </div>
+
+              {/* Rows */}
+              {filtered.map((review) => {
+                const daysInQueue = getDaysInQueue(review.createdAt);
+                return (
+                    <div
+                        key={review.id}
+                        className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-3 border-b px-4 py-3 last:border-b-0 hover:bg-secondary/50"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{review.courseTitle}</p>
+                        <p className="text-xs text-secondary-foreground">
+                          Review #{review.id}
+                        </p>
+                        {daysInQueue >= SLA_THRESHOLD && (
+                            <span className="mt-0.5 inline-flex items-center rounded-full bg-[#fee2e2] px-2 py-0.5 text-xs text-[#dc2626]">
+                      SLA exceeded
+                    </span>
+                        )}
+                      </div>
+
+                      <span className="text-xs text-secondary-foreground whitespace-nowrap">
+                  {formatDate(review.createdAt)}
+                        <br />
+                  <span className="text-secondary-foreground">{daysInQueue}d ago</span>
+                </span>
+
+                      <StatusBadge status={review.status} />
+
+                      <span className="min-w-[100px] text-xs">
+                  {review.reviewerName ?? (
+                      <span className="italic text-secondary-foreground">Unassigned</span>
+                  )}
+                </span>
+
+                      <Link
+                          href={`/aqad/review/${review.id}`}
+                          className="rounded-md bg-foreground px-3 py-1 text-xs text-background hover:opacity-90 whitespace-nowrap"
+                      >
+                        Start Review
+                      </Link>
+                    </div>
+                );
+              })}
+            </div>
+        )}
+      </div>
   );
 }
