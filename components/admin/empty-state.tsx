@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+import { div } from "motion/react-client";
 
 type EmptyStateProps = {
   icon: LucideIcon;

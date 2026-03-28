@@ -18,30 +18,36 @@ const accentClasses: Record<string, string> = {
   info: "border-l-4 border-l-[#3b82f6]",
 };
 
+function safeValue(value: string | number): string {
+  if (value === null || value === undefined) return "—";
+  if (typeof value === "number" && isNaN(value)) return "—";
+  return String(value);
+}
+
 export function StatCard({
-  label,
-  value,
-  icon: Icon,
-  subtitle,
-  className,
-  accent = "default",
-}: StatCardProps) {
+                           label,
+                           value,
+                           icon: Icon,
+                           subtitle,
+                           className,
+                           accent = "default",
+                         }: StatCardProps) {
   return (
-    <div
-      className={cn(
-        "rounded-lg border border-border bg-background p-5",
-        accentClasses[accent],
-        className,
-      )}
-    >
-      <div className="flex items-center gap-2">
-        {Icon && <Icon className="h-4 w-4 text-secondary-foreground" />}
-        <p className="text-sm text-secondary-foreground">{label}</p>
+      <div
+          className={cn(
+              "rounded-lg border border-border bg-background p-5",
+              accentClasses[accent],
+              className,
+          )}
+      >
+        <div className="flex items-center gap-2">
+          {Icon && <Icon className="h-4 w-4 text-secondary-foreground" />}
+          <p className="text-sm text-secondary-foreground">{label}</p>
+        </div>
+        <p className="mt-1 text-2xl font-bold">{safeValue(value)}</p>
+        {subtitle && (
+            <p className="mt-0.5 text-xs text-secondary-foreground">{subtitle}</p>
+        )}
       </div>
-      <p className="mt-1 text-2xl font-bold">{value}</p>
-      {subtitle && (
-        <p className="mt-0.5 text-xs text-secondary-foreground">{subtitle}</p>
-      )}
-    </div>
   );
 }
