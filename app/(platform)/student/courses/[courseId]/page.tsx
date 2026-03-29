@@ -1,255 +1,188 @@
 "use client";
 
 import { useParams } from "next/navigation";
+import { useEffect, useState, useCallback } from "react";
 import { PageHeader } from "@/components/platform/page-header";
 import { SectionCard } from "@/components/student/section-card";
 import { StatCard } from "@/components/student/stat-card";
 import { LectureCard } from "@/components/student/lecture-card";
-import { AssignmentCard } from "@/components/student/assignment-card";
-import { ExamCard } from "@/components/student/exam-card";
-import { GradeBreakdown } from "@/components/student/grade-breakdown";
-import { AttendanceChart } from "@/components/student/attendance-chart";
-import { StudentStatusBadge } from "@/components/student/student-status-badge";
-import {
-  mockCourses,
-  mockLectures,
-  mockAssignments,
-  mockExams,
-  mockGrades,
-  mockCourseAttendance,
-  mockAttendanceRecords,
-  mockStudentProfile,
-} from "@/constants/student-mock-data";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { CheckCircle } from "lucide-react";
+import { studentApi } from "@/lib/student-api";
+import type { ApiCourse, ApiModule, ApiLecture } from "@/lib/student-api";
 import Link from "next/link";
-import { StudentStatusBadge as ModuleStatusBadge } from "@/components/student/student-status-badge";
 
 export default function CourseDetailPage() {
   const { courseId } = useParams<{ courseId: string }>();
-  const course = mockCourses.find((c) => c.id === courseId);
 
-  if (!course) {
+  const [course, setCourse]     = useState<ApiCourse | null>(null);
+  const [modules, setModules]   = useState<ApiModule[]>([]);
+  const [lectures, setLectures] = useState<ApiLecture[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState<string | null>(null);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const id = Number(courseId);
+      const [courseRes, modulesRes, lecturesRes] = await Promise.allSettled([
+        studentApi.getCourse(id),
+        studentApi.getCourseModules(id),
+        studentApi.getCourseLectures(id),
+      ]);
+      if (courseRes.status === "fulfilled")   setCourse(courseRes.value);
+      if (modulesRes.status === "fulfilled")  setModules(Array.isArray(modulesRes.value) ? modulesRes.value : []);
+      if (lecturesRes.status === "fulfilled") setLectures(Array.isArray(lecturesRes.value) ? lecturesRes.value : []);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to load course");
+    } finally {
+      setLoading(false);
+    }
+  }, [courseId]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  if (loading) {
     return (
-      <div className="py-12 text-center">
-        <p className="text-secondary-foreground">Course not found.</p>
-        <Link href="/student/courses" className="mt-2 text-sm underline">
-          Back to courses
-        </Link>
-      </div>
+        <div className="space-y-4">
+          {[...Array(3)].map((_, i) => (
+              <div key={i} className="h-20 animate-pulse rounded-lg bg-secondary" />
+          ))}
+        </div>
     );
   }
 
-  const courseLectures = mockLectures.filter((l) => l.courseId === courseId);
-  const courseAssignments = mockAssignments.filter((a) => a.courseId === courseId);
-  const courseExams = mockExams.filter((e) => e.courseId === courseId);
-  const courseGrade = mockGrades.find((g) => g.courseId === courseId);
-  const courseAttendance = mockCourseAttendance.find((ca) => ca.courseId === courseId);
-  const courseAttendanceRecords = mockAttendanceRecords.filter((ar) => ar.courseId === courseId);
-  const { accessStatus } = mockStudentProfile;
+  if (error || !course) {
+    return (
+        <div className="py-12 text-center">
+          <p className="text-secondary-foreground">{error ?? "Course not found."}</p>
+          <Link href="/student/courses" className="mt-2 text-sm underline">
+            Back to courses
+          </Link>
+        </div>
+    );
+  }
 
   return (
-    <div>
-      <div className="mb-2">
-        <Link href="/student/courses" className="text-sm text-secondary-foreground hover:text-foreground">
-          ← Back to courses
-        </Link>
-      </div>
-      <PageHeader title={course.name} description={`${course.code} · ${course.teacherName}`} />
+      <div>
+        <div className="mb-2">
+          <Link href="/student/courses" className="text-sm text-secondary-foreground hover:text-foreground">
+            ← Back to courses
+          </Link>
+        </div>
+        <PageHeader
+            title={course.title}
+            description={course.teacherName ?? ""}
+        />
 
-      <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatCard label="Progress" value={`${course.progress}%`} />
-        <StatCard label="Grade" value={course.currentGrade ?? "N/A"} subtitle={course.currentScore !== undefined ? `${course.currentScore}/100` : undefined} />
-        <StatCard label="Attendance" value={`${course.attendanceRate}%`} />
-        <StatCard label="Credits" value={course.credits} />
-      </div>
+        <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <StatCard label="Credits"    value={String(course.credits ?? "—")} />
+          <StatCard label="Language"   value={course.language ?? "—"} />
+          <StatCard label="Modules"    value={String(modules.length)} />
+          <StatCard label="Lectures"   value={String(lectures.length)} />
+        </div>
 
-      <Tabs defaultValue="syllabus">
-        <TabsList className="mb-6 w-full flex-wrap">
-          <TabsTrigger value="syllabus">Syllabus</TabsTrigger>
-          <TabsTrigger value="modules">Modules</TabsTrigger>
-          <TabsTrigger value="assignments">Assignments</TabsTrigger>
-          <TabsTrigger value="exams">Exams</TabsTrigger>
-          <TabsTrigger value="attendance">Attendance</TabsTrigger>
-          <TabsTrigger value="grades">Grades</TabsTrigger>
-        </TabsList>
+        <Tabs defaultValue="overview">
+          <TabsList className="mb-6">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="modules">Modules ({modules.length})</TabsTrigger>
+            <TabsTrigger value="lectures">Lectures ({lectures.length})</TabsTrigger>
+          </TabsList>
 
-        {/* Syllabus */}
-        <TabsContent value="syllabus">
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {/* Overview */}
+          <TabsContent value="overview">
             <SectionCard title="Course Overview">
-              <p className="text-sm leading-relaxed text-secondary-foreground">{course.description}</p>
-              <div className="mt-4 space-y-2 text-sm">
-                <div className="flex gap-2">
-                  <span className="w-24 shrink-0 text-secondary-foreground">Language</span>
-                  <span>{course.language}</span>
-                </div>
-                <div className="flex gap-2">
-                  <span className="w-24 shrink-0 text-secondary-foreground">Category</span>
-                  <span>{course.category}</span>
-                </div>
-                <div className="flex gap-2">
-                  <span className="w-24 shrink-0 text-secondary-foreground">Schedule</span>
-                  <span>{course.schedule}</span>
-                </div>
-                <div className="flex gap-2">
-                  <span className="w-24 shrink-0 text-secondary-foreground">Teacher</span>
-                  <span>{course.teacherName}</span>
-                </div>
-              </div>
-              {course.prerequisites && course.prerequisites.length > 0 && (
-                <div className="mt-4">
-                  <p className="mb-1 text-sm font-medium">Prerequisites</p>
-                  <ul className="space-y-1">
-                    {course.prerequisites.map((p, i) => (
-                      <li key={i} className="flex items-center gap-2 text-sm text-secondary-foreground">
-                        <CheckCircle className="h-3.5 w-3.5 text-green-600" />
-                        {p}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </SectionCard>
-
-            <SectionCard title="Grading Policy">
-              <div className="space-y-2">
-                {course.gradingPolicy.map((item, i) => (
-                  <div key={i} className="flex items-center justify-between rounded-md border border-border px-4 py-2.5 text-sm">
-                    <div>
-                      <p className="font-medium">{item.type}</p>
-                      {item.description && <p className="text-xs text-secondary-foreground">{item.description}</p>}
-                    </div>
-                    <span className="font-bold">{item.weight}%</span>
-                  </div>
-                ))}
-              </div>
-            </SectionCard>
-          </div>
-        </TabsContent>
-
-        {/* Modules */}
-        <TabsContent value="modules">
-          <SectionCard title="Course Modules">
-            {course.modules.length === 0 ? (
-              <p className="text-sm text-secondary-foreground">No modules defined for this course.</p>
-            ) : (
-              <Accordion type="multiple" className="space-y-2">
-                {course.modules.map((mod) => {
-                  const modLectures = courseLectures.filter((l) => l.moduleId === mod.id);
-                  return (
-                    <AccordionItem key={mod.id} value={mod.id} className="rounded-lg border border-border px-4">
-                      <AccordionTrigger className="py-3 hover:no-underline">
-                        <div className="flex items-center gap-3">
-                          <span className="font-medium">{mod.name}</span>
-                          <ModuleStatusBadge status={mod.status} />
-                        </div>
-                      </AccordionTrigger>
-                      <AccordionContent className="pb-3">
-                        {mod.description && (
-                          <p className="mb-3 text-sm text-secondary-foreground">{mod.description}</p>
-                        )}
-                        {modLectures.length === 0 ? (
-                          <p className="text-sm text-secondary-foreground">No lectures in this module yet.</p>
-                        ) : (
-                          <div className="space-y-2">
-                            {modLectures.map((l) => (
-                              <LectureCard key={l.id} lecture={l} showCourse={false} />
-                            ))}
-                          </div>
-                        )}
-                      </AccordionContent>
-                    </AccordionItem>
-                  );
-                })}
-              </Accordion>
-            )}
-          </SectionCard>
-        </TabsContent>
-
-        {/* Assignments */}
-        <TabsContent value="assignments">
-          <SectionCard title="Assignments">
-            {courseAssignments.length === 0 ? (
-              <p className="text-sm text-secondary-foreground">No assignments for this course.</p>
-            ) : (
-              <div className="space-y-3">
-                {courseAssignments.map((a) => (
-                  <AssignmentCard key={a.id} assignment={a} />
-                ))}
-              </div>
-            )}
-          </SectionCard>
-        </TabsContent>
-
-        {/* Exams */}
-        <TabsContent value="exams">
-          <SectionCard title="Exams">
-            {courseExams.length === 0 ? (
-              <p className="text-sm text-secondary-foreground">No exams scheduled.</p>
-            ) : (
-              <div className="space-y-4">
-                {courseExams.map((exam) => (
-                  <ExamCard
-                    key={exam.id}
-                    exam={exam}
-                    accessStatus={accessStatus}
-                    showEligibility
-                  />
-                ))}
-              </div>
-            )}
-          </SectionCard>
-        </TabsContent>
-
-        {/* Attendance */}
-        <TabsContent value="attendance">
-          <div className="space-y-6">
-            {courseAttendance && (
-              <SectionCard title="Attendance Summary">
-                <AttendanceChart courses={[courseAttendance]} />
-              </SectionCard>
-            )}
-            <SectionCard title="Attendance History">
-              {courseAttendanceRecords.length === 0 ? (
-                <p className="text-sm text-secondary-foreground">No attendance records yet.</p>
+              {course.description ? (
+                  <p className="text-sm leading-relaxed text-secondary-foreground">
+                    {course.description}
+                  </p>
               ) : (
-                <div className="space-y-2">
-                  {courseAttendanceRecords.map((rec) => (
-                    <div key={rec.id} className="flex items-center justify-between rounded-md border border-border px-4 py-2.5">
-                      <div>
-                        <p className="text-sm font-medium">{rec.lectureTitle}</p>
-                        <p className="text-xs text-secondary-foreground">
-                          {new Date(rec.date).toLocaleDateString("en-US", { weekday: "short", day: "numeric", month: "short" })}
-                          {rec.joinTime && ` · Joined ${rec.joinTime}`}
-                          {rec.duration !== undefined && ` · ${rec.duration} min`}
-                        </p>
-                      </div>
-                      <StudentStatusBadge status={rec.status} />
+                  <p className="text-sm text-secondary-foreground">No description available.</p>
+              )}
+              <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                {course.teacherName && (
+                    <div>
+                      <p className="text-xs text-secondary-foreground">Teacher</p>
+                      <p className="font-medium">{course.teacherName}</p>
                     </div>
-                  ))}
+                )}
+                {course.language && (
+                    <div>
+                      <p className="text-xs text-secondary-foreground">Language</p>
+                      <p className="font-medium">{course.language}</p>
+                    </div>
+                )}
+                <div>
+                  <p className="text-xs text-secondary-foreground">Status</p>
+                  <p className="font-medium">{course.status}</p>
                 </div>
+                {course.credits && (
+                    <div>
+                      <p className="text-xs text-secondary-foreground">Credits</p>
+                      <p className="font-medium">{course.credits}</p>
+                    </div>
+                )}
+              </div>
+            </SectionCard>
+          </TabsContent>
+
+          {/* Modules */}
+          <TabsContent value="modules">
+            <SectionCard title="Course Modules">
+              {modules.length === 0 ? (
+                  <p className="text-sm text-secondary-foreground">No modules defined for this course.</p>
+              ) : (
+                  <div className="space-y-3">
+                    {modules.map((mod) => (
+                        <div key={mod.id} className="rounded-lg border border-border p-4">
+                          <p className="font-medium">{mod.title}</p>
+                          {mod.description && (
+                              <p className="mt-1 text-sm text-secondary-foreground">{mod.description}</p>
+                          )}
+                        </div>
+                    ))}
+                  </div>
               )}
             </SectionCard>
-          </div>
-        </TabsContent>
+          </TabsContent>
 
-        {/* Grades */}
-        <TabsContent value="grades">
-          <SectionCard title="Grade Breakdown">
-            {courseGrade ? (
-              <GradeBreakdown
-                items={courseGrade.items}
-                totalScore={courseGrade.totalScore}
-                letterGrade={courseGrade.letterGrade}
-              />
-            ) : (
-              <p className="text-sm text-secondary-foreground">No grades available yet.</p>
-            )}
-          </SectionCard>
-        </TabsContent>
-      </Tabs>
-    </div>
+          {/* Lectures */}
+          <TabsContent value="lectures">
+            <SectionCard title="Lectures">
+              {lectures.length === 0 ? (
+                  <p className="text-sm text-secondary-foreground">No lectures available.</p>
+              ) : (
+                  <div className="space-y-3">
+                    {lectures.map((lecture) => (
+                        <div key={lecture.id} className="rounded-lg border border-border p-4">
+                          <p className="font-medium">{lecture.title}</p>
+                          {lecture.description && (
+                              <p className="mt-1 text-sm text-secondary-foreground line-clamp-2">
+                                {lecture.description}
+                              </p>
+                          )}
+                          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-secondary-foreground">
+                            {lecture.date && <span>📅 {lecture.date}</span>}
+                            {lecture.startTime && <span>🕐 {lecture.startTime} – {lecture.endTime}</span>}
+                            {lecture.status && <span>Status: {lecture.status}</span>}
+                          </div>
+                          {lecture.meetingUrl && (
+                            <a
+                              href={lecture.meetingUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="mt-2 inline-block rounded-md bg-foreground px-3 py-1 text-xs text-background hover:opacity-90"
+                            >
+                            Join Meeting
+                            </a>
+                            )}
+                        </div>
+                    ))}
+                  </div>
+              )}
+            </SectionCard>
+          </TabsContent>
+        </Tabs>
+      </div>
   );
 }
