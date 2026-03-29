@@ -1,163 +1,168 @@
 "use client";
 
+import { useEffect, useState, useCallback } from "react";
 import { PageHeader } from "@/components/platform/page-header";
-import { CourseStatusBadge } from "@/components/teacher/course-status-badge";
 import { EmptyState } from "@/components/teacher/empty-state";
-import { mockCourses } from "@/constants/teacher-mock-data";
-import type { CourseStatus } from "@/types/teacher";
-import { BookOpen, Plus, Search, Users } from "lucide-react";
+import { teacherApi } from "@/lib/teacher-api";
+import type { ApiCourse } from "@/lib/teacher-api";
+import { BookOpen, Plus, Search } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
 
-const STATUS_TABS: { label: string; value: string }[] = [
-  { label: "All", value: "all" },
-  { label: "Draft", value: "Draft" },
-  { label: "In Review", value: "InReview" },
-  { label: "Approved", value: "Approved" },
-  { label: "Published", value: "Published" },
-  { label: "Rejected", value: "Rejected" },
+const STATUS_FILTERS = [
+  { label: "All",        value: "" },
+  { label: "Draft",      value: "DRAFT" },
+  { label: "In Review",  value: "IN_REVIEW" },
+  { label: "Approved",   value: "APPROVED" },
+  { label: "Published",  value: "PUBLISHED" },
+  { label: "Rejected",   value: "REJECTED" },
+  { label: "Archived",   value: "ARCHIVED" },
 ];
 
-export default function TeacherCoursesPage() {
-  const [search, setSearch] = useState("");
-  const [activeStatus, setActiveStatus] = useState("all");
+function getStatusClass(status: string) {
+  if (status === "PUBLISHED") return "bg-[#dcfce7] text-[#166534]";
+  if (status === "APPROVED")  return "bg-[#dbeafe] text-[#1d4ed8]";
+  if (status === "IN_REVIEW") return "bg-[#fef9c3] text-[#854d0e]";
+  if (status === "REJECTED")  return "bg-[#fee2e2] text-[#991b1b]";
+  return "bg-[#f0f0f0] text-[#666]";
+}
 
-  const filtered = mockCourses.filter((c) => {
-    const matchesSearch =
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.code.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = activeStatus === "all" || c.status === activeStatus;
-    return matchesSearch && matchesStatus;
-  });
+export default function CoursesPage() {
+  const [courses, setCourses]           = useState<ApiCourse[]>([]);
+  const [loading, setLoading]           = useState(true);
+  const [error, setError]               = useState<string | null>(null);
+  const [search, setSearch]             = useState("");
+  const [activeStatus, setActiveStatus] = useState("");
+
+  const fetchCourses = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await teacherApi.getCourses({
+        search: search || undefined,
+        status: activeStatus || undefined,
+      });
+      const arr = Array.isArray(data) ? data : data.content ?? [];
+      setCourses(arr);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to load courses");
+    } finally {
+      setLoading(false);
+    }
+  }, [search, activeStatus]);
+
+  useEffect(() => { fetchCourses(); }, [fetchCourses]);
+
+  if (error) {
+    return (
+        <div className="flex flex-col items-center justify-center py-20 gap-3">
+          <p className="text-sm text-red-500">{error}</p>
+          <button onClick={fetchCourses} className="rounded-md border border-border px-4 py-2 text-sm hover:bg-secondary">
+            Retry
+          </button>
+        </div>
+    );
+  }
 
   return (
-    <div>
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-        <PageHeader title="My Courses" description="Manage your course catalog" />
-        <Link
-          href="/teacher/courses/create"
-          className="flex items-center gap-1.5 rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90"
-        >
-          <Plus className="h-4 w-4" />
-          Create Course
-        </Link>
-      </div>
-
-      {/* Filters */}
-      <div className="mb-6 space-y-3">
-        <div className="relative max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-secondary-foreground" />
-          <input
-            type="text"
-            placeholder="Search by name or code..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-md border border-border bg-background py-2 pl-9 pr-3 text-sm outline-none focus:border-foreground"
+      <div>
+        <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+          <PageHeader
+              title="My Courses"
+              description={loading ? "Loading..." : `${courses.length} courses`}
           />
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {STATUS_TABS.map((tab) => (
-            <button
-              key={tab.value}
-              onClick={() => setActiveStatus(tab.value)}
-              className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
-                activeStatus === tab.value
-                  ? "bg-foreground text-background"
-                  : "border border-border bg-background text-foreground hover:bg-secondary"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Course Grid */}
-      {filtered.length === 0 ? (
-        <EmptyState
-          icon={BookOpen}
-          title="No courses found"
-          description="Try adjusting your filters or create a new course"
-          action={
-            <Link
+          <Link
               href="/teacher/courses/create"
-              className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90"
-            >
-              Create Course
-            </Link>
-          }
-        />
-      ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((course) => (
-            <Link
-              key={course.id}
-              href={`/teacher/courses/${course.id}`}
-              className="group rounded-lg border border-border bg-background p-5 transition-shadow hover:shadow-md"
-            >
-              <div className="mb-3 flex items-start justify-between gap-2">
-                <div>
-                  <p className="text-xs font-medium text-secondary-foreground">{course.code}</p>
-                  <h3 className="mt-0.5 font-semibold leading-tight group-hover:underline">
-                    {course.name}
-                  </h3>
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  <CourseStatusBadge status={course.status as CourseStatus} />
-                  {course.status === "Rejected" && course.aqadRemarks && course.aqadRemarks > 0 && (
-                    <span className="rounded-full bg-[#fee2e2] px-2 py-0.5 text-xs text-[#991b1b]">
-                      {course.aqadRemarks} remark{course.aqadRemarks > 1 ? "s" : ""}
-                    </span>
-                  )}
-                </div>
-              </div>
+              className="flex items-center gap-1.5 rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90"
+          >
+            <Plus className="h-4 w-4" /> New Course
+          </Link>
+        </div>
 
-              <p className="mb-4 text-xs text-secondary-foreground line-clamp-2">
-                {course.description}
-              </p>
+        {/* Search */}
+        <div className="mb-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-secondary-foreground" />
+            <input
+                type="text"
+                placeholder="Search courses..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full max-w-sm rounded-md border border-border bg-background py-2 pl-9 pr-3 text-sm focus:outline-none focus:border-foreground"
+            />
+          </div>
+        </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div className="rounded-md bg-secondary p-2">
-                  <div className="flex items-center gap-1.5">
-                    <Users className="h-3.5 w-3.5 text-secondary-foreground" />
-                    <span className="text-xs text-secondary-foreground">Students</span>
-                  </div>
-                  <p className="mt-0.5 text-sm font-semibold">{course.totalStudents}</p>
-                </div>
-                <div className="rounded-md bg-secondary p-2">
-                  <p className="text-xs text-secondary-foreground">Lectures</p>
-                  <p className="mt-0.5 text-sm font-semibold">
-                    {course.completedLectures}/{course.totalLectures}
-                  </p>
-                </div>
-                {course.status === "Published" && (
-                  <>
-                    <div className="rounded-md bg-secondary p-2">
-                      <p className="text-xs text-secondary-foreground">Attendance</p>
-                      <p
-                        className={`mt-0.5 text-sm font-semibold ${
-                          course.avgAttendance < 75 ? "text-[#ef4444]" : ""
-                        }`}
-                      >
-                        {course.avgAttendance}%
-                      </p>
-                    </div>
-                    <div className="rounded-md bg-secondary p-2">
-                      <p className="text-xs text-secondary-foreground">Avg Grade</p>
-                      <p className="mt-0.5 text-sm font-semibold">{course.avgGrade}</p>
-                    </div>
-                  </>
-                )}
-              </div>
-
-              <div className="mt-3 flex items-center justify-between text-xs text-secondary-foreground">
-                <span>Semester {course.semester}</span>
-                <span>{course.credits} credits · {course.language}</span>
-              </div>
-            </Link>
+        {/* Status Filters */}
+        <div className="mb-6 flex flex-wrap gap-2">
+          {STATUS_FILTERS.map((f) => (
+              <button
+                  key={f.value}
+                  onClick={() => setActiveStatus(f.value)}
+                  className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
+                      activeStatus === f.value
+                          ? "bg-foreground text-background"
+                          : "border border-border bg-background hover:bg-secondary"
+                  }`}
+              >
+                {f.label}
+              </button>
           ))}
         </div>
-      )}
-    </div>
+
+        {loading ? (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {[...Array(6)].map((_, i) => (
+                  <div key={i} className="h-44 animate-pulse rounded-lg bg-secondary" />
+              ))}
+            </div>
+        ) : courses.length === 0 ? (
+            <EmptyState
+                icon={BookOpen}
+                title="No courses found"
+                description={
+                  activeStatus || search
+                      ? "Try adjusting your filters."
+                      : "Create your first course to get started."
+                }
+                action={
+                  !activeStatus && !search ? (
+                      <Link
+                          href="/teacher/courses/create"
+                          className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90"
+                      >
+                        Create Course
+                      </Link>
+                  ) : undefined
+                }
+            />
+        ) : (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {courses.map((course) => (
+                  <Link
+                      key={course.id}
+                      href={`/teacher/courses/${course.id}`}
+                      className="rounded-lg border border-border bg-background p-5 hover:bg-secondary/40 transition-colors"
+                  >
+                    <div className="mb-3 flex items-start justify-between gap-2">
+                      <h3 className="font-semibold leading-tight line-clamp-2">{course.title}</h3>
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${getStatusClass(course.status)}`}>
+                  {course.status.replace("_", " ")}
+                </span>
+                    </div>
+                    {course.description && (
+                        <p className="mb-3 text-sm text-secondary-foreground line-clamp-2">
+                          {course.description}
+                        </p>
+                    )}
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-secondary-foreground">
+                      {course.language && <span>🌐 {course.language}</span>}
+                      {course.level    && <span>📊 {course.level}</span>}
+                      <span>v{course.version}</span>
+                    </div>
+                  </Link>
+              ))}
+            </div>
+        )}
+      </div>
   );
 }

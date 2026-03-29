@@ -104,6 +104,7 @@ export const roleConfigs: Record<string, RoleConfig> = {
       { label: "Attendance", href: "/student/attendance", icon: UserCheck },
       { label: "Finance", href: "/student/finance", icon: DollarSign },
       { label: "Schedule", href: "/student/schedule", icon: Calendar },
+      { label: "Complaints", href: "/student/complaints", icon: MessageSquare },
       { label: "Profile", href: "/student/profile", icon: Settings },
     ],
   },

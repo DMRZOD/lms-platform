@@ -6,23 +6,25 @@ interface RequestConfig {
     method?: Method;
     body?: unknown;
     headers?: Record<string, string>;
+    isFormData?: boolean;
 }
 
 async function request<T>(endpoint: string, config: RequestConfig = {}): Promise<T> {
-    const { method = "GET", body, headers = {} } = config;
+    const { method = "GET", body, headers = {}, isFormData = false } = config;
 
-    const token = typeof window !== "undefined"
-        ? localStorage.getItem("accessToken")
-        : null;
+    const token =
+        typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
 
     const res = await fetch(`${BASE_URL}${endpoint}`, {
         method,
         headers: {
-            "Content-Type": "application/json",
+            ...(isFormData ? {} : { "Content-Type": "application/json" }),
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
             ...headers,
         },
-        ...(body ? { body: JSON.stringify(body) } : {}),
+        ...(body
+            ? { body: isFormData ? (body as FormData) : JSON.stringify(body) }
+            : {}),
     });
 
     if (res.status === 401) {
@@ -68,9 +70,10 @@ function redirectToLogin() {
 }
 
 export const apiClient = {
-    get:    <T>(url: string)                 => request<T>(url),
-    post:   <T>(url: string, body?: unknown) => request<T>(url, { method: "POST", body }),
-    put:    <T>(url: string, body?: unknown) => request<T>(url, { method: "PUT", body }),
-    patch:  <T>(url: string, body?: unknown) => request<T>(url, { method: "PATCH", body }),
-    delete: <T>(url: string)                 => request<T>(url, { method: "DELETE" }),
+    get:      <T>(url: string)                     => request<T>(url),
+    post:     <T>(url: string, body?: unknown)     => request<T>(url, { method: "POST",   body }),
+    put:      <T>(url: string, body?: unknown)     => request<T>(url, { method: "PUT",    body }),
+    patch:    <T>(url: string, body?: unknown)     => request<T>(url, { method: "PATCH",  body }),
+    delete:   <T>(url: string)                     => request<T>(url, { method: "DELETE" }),
+    postForm: <T>(url: string, formData: FormData) => request<T>(url, { method: "POST", body: formData, isFormData: true }),
 };

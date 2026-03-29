@@ -58,19 +58,6 @@ const statusColors: Record<string, { bg: string; text: string }> = {
     SUSPENDED: { bg: "bg-[#fee2e2]", text: "text-[#991b1b]" },
 };
 
-const roleColors: Record<string, { bg: string; text: string }> = {
-    ADMIN:      { bg: "bg-[#fdf2f8]", text: "text-[#9d174d]" },
-    IT_OPS:     { bg: "bg-[#eff6ff]", text: "text-[#1d4ed8]" },
-    DEPUTY:     { bg: "bg-[#f5f3ff]", text: "text-[#6d28d9]" },
-    ACADEMIC:   { bg: "bg-[#fff7ed]", text: "text-[#c2410c]" },
-    ACCOUNTANT: { bg: "bg-[#f0fdf4]", text: "text-[#15803d]" },
-    AQAD:       { bg: "bg-[#ecfeff]", text: "text-[#0e7490]" },
-    RESOURCE:   { bg: "bg-[#fefce8]", text: "text-[#a16207]" },
-    TEACHER:    { bg: "bg-[#f0f9ff]", text: "text-[#0369a1]" },
-    STUDENT:    { bg: "bg-[#f8fafc]", text: "text-[#334155]" },
-    APPLICANT:  { bg: "bg-[#fafaf9]", text: "text-[#44403c]" },
-};
-
 const statusFilters = [
     { label: "All",       value: "all" },
     { label: "Active",    value: "ACTIVE" },
@@ -78,18 +65,31 @@ const statusFilters = [
     { label: "Suspended", value: "SUSPENDED" },
 ];
 
+const roleColors: Record<string, { bg: string; text: string }> = {
+    ADMIN:               { bg: "bg-[#fdf2f8]", text: "text-[#9d174d]" },
+    IT_OPERATIONS:       { bg: "bg-[#eff6ff]", text: "text-[#1d4ed8]" },
+    DEPUTY_DIRECTOR:     { bg: "bg-[#f5f3ff]", text: "text-[#6d28d9]" },
+    ACADEMIC_DEPARTMENT: { bg: "bg-[#fff7ed]", text: "text-[#c2410c]" },
+    FINANCE:             { bg: "bg-[#f0fdf4]", text: "text-[#15803d]" },
+    AQAD:                { bg: "bg-[#ecfeff]", text: "text-[#0e7490]" },
+    RESOURCE_DEPARTMENT: { bg: "bg-[#fefce8]", text: "text-[#a16207]" },
+    TEACHER:             { bg: "bg-[#f0f9ff]", text: "text-[#0369a1]" },
+    STUDENT:             { bg: "bg-[#f8fafc]", text: "text-[#334155]" },
+    APPLICANT:           { bg: "bg-[#fafaf9]", text: "text-[#44403c]" },
+};
+
 const roleOptions = [
-    { label: "All Roles",  value: "all" },
-    { label: "Admin",      value: "ADMIN" },
-    { label: "IT Ops",     value: "IT_OPS" },
-    { label: "Deputy",     value: "DEPUTY" },
-    { label: "Academic",   value: "ACADEMIC" },
-    { label: "Finance",    value: "ACCOUNTANT" },
-    { label: "AQAD",       value: "AQAD" },
-    { label: "Resource",   value: "RESOURCE" },
-    { label: "Teacher",    value: "TEACHER" },
-    { label: "Student",    value: "STUDENT" },
-    { label: "Applicant",  value: "APPLICANT" },
+    { label: "All Roles",   value: "all" },
+    { label: "Admin",       value: "ADMIN" },
+    { label: "IT Ops",      value: "IT_OPERATIONS" },
+    { label: "Deputy",      value: "DEPUTY_DIRECTOR" },
+    { label: "Academic",    value: "ACADEMIC_DEPARTMENT" },
+    { label: "Finance",     value: "FINANCE" },
+    { label: "AQAD",        value: "AQAD" },
+    { label: "Resource",    value: "RESOURCE_DEPARTMENT" },
+    { label: "Teacher",     value: "TEACHER" },
+    { label: "Student",     value: "STUDENT" },
+    { label: "Applicant",   value: "APPLICANT" },
 ];
 
 function formatDate(iso: string) {
