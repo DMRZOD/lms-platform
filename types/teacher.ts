@@ -225,6 +225,24 @@ export type LectureAttendance = {
   records: StudentAttendanceRecord[];
 };
 
+export type TeacherOwnLectureStatus = "conducted" | "missed" | "cancelled" | "substituted";
+
+export type TeacherOwnLectureRecord = {
+  lectureId: string;
+  courseId: string;
+  courseCode: string;
+  courseName: string;
+  topic: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  room?: string;
+  status: TeacherOwnLectureStatus;
+  missedReason?: string;
+  substituteTeacher?: string;
+  cancelReason?: string;
+};
+
 // ─── Gradebook ───────────────────────────────────────────────────────────────
 
 export type GradebookColumn = {

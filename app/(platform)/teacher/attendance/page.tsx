@@ -1,9 +1,28 @@
 "use client";
 
 import { PageHeader } from "@/components/platform/page-header";
-import { mockCourses, mockLectureAttendance } from "@/constants/teacher-mock-data";
+import {
+  mockCourses,
+  mockLectureAttendance,
+  mockTeacherOwnAttendance,
+} from "@/constants/teacher-mock-data";
+import type { TeacherOwnLectureStatus } from "@/types/teacher";
 import { AlertTriangle, ChevronDown } from "lucide-react";
 import { useState } from "react";
+
+const STATUS_LABELS: Record<TeacherOwnLectureStatus, string> = {
+  conducted: "Conducted",
+  missed: "Missed",
+  cancelled: "Cancelled",
+  substituted: "Substituted",
+};
+
+const STATUS_STYLES: Record<TeacherOwnLectureStatus, string> = {
+  conducted: "bg-[#dcfce7] text-[#166534]",
+  missed: "bg-[#fee2e2] text-[#991b1b]",
+  cancelled: "bg-[#fef9c3] text-[#854d0e]",
+  substituted: "bg-[#dbeafe] text-[#1e40af]",
+};
 
 export default function AttendancePage() {
   const publishedCourses = mockCourses.filter(
@@ -11,6 +30,7 @@ export default function AttendancePage() {
   );
   const [selectedCourseId, setSelectedCourseId] = useState(publishedCourses[0]?.id ?? "");
   const [selectedLectureId, setSelectedLectureId] = useState<string | null>(null);
+  const [ownFilter, setOwnFilter] = useState<TeacherOwnLectureStatus | "all">("all");
 
   const selectedLecture = selectedLectureId
     ? mockLectureAttendance.find((a) => a.lectureId === selectedLectureId)
@@ -26,14 +46,34 @@ export default function AttendancePage() {
 
   const lowAttendanceLectures = mockLectureAttendance.filter((a) => a.attendanceRate < 75);
 
+  // My Attendance stats
+  const conducted = mockTeacherOwnAttendance.filter((r) => r.status === "conducted").length;
+  const missed = mockTeacherOwnAttendance.filter((r) => r.status === "missed").length;
+  const cancelled = mockTeacherOwnAttendance.filter((r) => r.status === "cancelled").length;
+  const substituted = mockTeacherOwnAttendance.filter((r) => r.status === "substituted").length;
+  const total = mockTeacherOwnAttendance.length;
+  const ownRate = total > 0 ? Math.round((conducted / total) * 100) : 0;
+
+  const filteredOwnAttendance =
+    ownFilter === "all"
+      ? mockTeacherOwnAttendance
+      : mockTeacherOwnAttendance.filter((r) => r.status === ownFilter);
+
+  const sortedOwn = [...filteredOwnAttendance].sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+  );
+
   return (
     <div>
       <div className="mb-6">
-        <PageHeader title="Attendance" description="Track student attendance across lectures" />
+        <PageHeader title="Attendance" description="Track student attendance and your own lecture history" />
       </div>
 
+      {/* ── Student Attendance ─────────────────────────────────────────── */}
+      <h2 className="mb-4 text-base font-semibold">Student Attendance</h2>
+
       {/* Course Selector */}
-      <div className="mb-6 flex items-center gap-3">
+      <div className="mb-5 flex items-center gap-3">
         <label className="text-sm font-medium">Course:</label>
         <div className="relative">
           <select
@@ -55,7 +95,7 @@ export default function AttendancePage() {
       </div>
 
       {/* Stats */}
-      <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="mb-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
         <div className="rounded-lg border border-border bg-background p-4">
           <p className="text-xs text-secondary-foreground">Avg Attendance</p>
           <p className={`text-2xl font-bold ${avgAttendance < 75 ? "text-[#ef4444]" : ""}`}>
@@ -82,7 +122,7 @@ export default function AttendancePage() {
 
       {/* Low Attendance Alert */}
       {lowAttendanceLectures.length > 0 && (
-        <div className="mb-6 rounded-lg border border-[#fde68a] bg-[#fef9c3] p-4">
+        <div className="mb-5 rounded-lg border border-[#fde68a] bg-[#fef9c3] p-4">
           <div className="flex items-start gap-2">
             <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#92400e]" />
             <div>
@@ -102,10 +142,10 @@ export default function AttendancePage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+      <div className="mb-10 grid grid-cols-1 gap-6 lg:grid-cols-5">
         {/* Lecture List */}
         <div className="lg:col-span-2">
-          <h2 className="mb-3 font-semibold">Lectures</h2>
+          <h3 className="mb-3 text-sm font-semibold text-secondary-foreground uppercase tracking-wide">Lectures</h3>
           <div className="space-y-2">
             {mockLectureAttendance.map((lecture) => (
               <button
@@ -153,7 +193,7 @@ export default function AttendancePage() {
           ) : (
             <div>
               <div className="mb-4">
-                <h2 className="font-semibold">{selectedLecture.lectureTopic}</h2>
+                <h3 className="font-semibold">{selectedLecture.lectureTopic}</h3>
                 <p className="text-sm text-secondary-foreground">{selectedLecture.date}</p>
               </div>
 
@@ -221,6 +261,114 @@ export default function AttendancePage() {
               </p>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* ── My Attendance ──────────────────────────────────────────────── */}
+      <div className="border-t border-border pt-8">
+        <h2 className="mb-4 text-base font-semibold">My Attendance</h2>
+
+        {/* My Attendance Stats */}
+        <div className="mb-5 grid grid-cols-2 gap-4 sm:grid-cols-5">
+          <div className="rounded-lg border border-border bg-background p-4">
+            <p className="text-xs text-secondary-foreground">Conducted</p>
+            <p className="text-2xl font-bold text-[#16a34a]">{conducted}</p>
+          </div>
+          <div className="rounded-lg border border-border bg-background p-4">
+            <p className="text-xs text-secondary-foreground">Missed</p>
+            <p className={`text-2xl font-bold ${missed > 0 ? "text-[#ef4444]" : ""}`}>{missed}</p>
+          </div>
+          <div className="rounded-lg border border-border bg-background p-4">
+            <p className="text-xs text-secondary-foreground">Cancelled</p>
+            <p className={`text-2xl font-bold ${cancelled > 0 ? "text-[#f59e0b]" : ""}`}>{cancelled}</p>
+          </div>
+          <div className="rounded-lg border border-border bg-background p-4">
+            <p className="text-xs text-secondary-foreground">Substituted</p>
+            <p className="text-2xl font-bold text-[#2563eb]">{substituted}</p>
+          </div>
+          <div className="rounded-lg border border-border bg-background p-4">
+            <p className="text-xs text-secondary-foreground">Conduct Rate</p>
+            <p className={`text-2xl font-bold ${ownRate < 80 ? "text-[#ef4444]" : ""}`}>{ownRate}%</p>
+            <p className="text-xs text-secondary-foreground">{conducted}/{total} lectures</p>
+          </div>
+        </div>
+
+        {/* Status Filter */}
+        <div className="mb-4 flex flex-wrap gap-2">
+          {(["all", "conducted", "missed", "cancelled", "substituted"] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => setOwnFilter(f)}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                ownFilter === f
+                  ? "bg-foreground text-background"
+                  : "border border-border bg-background hover:bg-secondary"
+              }`}
+            >
+              {f === "all" ? "All" : STATUS_LABELS[f]}
+              {f !== "all" && (
+                <span className="ml-1 opacity-60">
+                  ({mockTeacherOwnAttendance.filter((r) => r.status === f).length})
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* My Attendance Table */}
+        <div className="overflow-hidden rounded-lg border border-border">
+          <table className="w-full text-sm">
+            <thead className="bg-secondary">
+              <tr>
+                <th className="p-3 text-left font-medium">Date</th>
+                <th className="p-3 text-left font-medium">Course</th>
+                <th className="p-3 text-left font-medium">Topic</th>
+                <th className="p-3 text-left font-medium">Time</th>
+                <th className="p-3 text-left font-medium">Status</th>
+                <th className="p-3 text-left font-medium">Note</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedOwn.map((rec) => {
+                const note =
+                  rec.status === "missed"
+                    ? rec.missedReason
+                    : rec.status === "cancelled"
+                      ? rec.cancelReason
+                      : rec.status === "substituted"
+                        ? `Sub: ${rec.substituteTeacher}`
+                        : null;
+                return (
+                  <tr key={rec.lectureId} className="border-t border-border">
+                    <td className="p-3 text-secondary-foreground whitespace-nowrap">{rec.date}</td>
+                    <td className="p-3">
+                      <span className="font-medium">{rec.courseCode}</span>
+                      <span className="ml-1 text-xs text-secondary-foreground hidden sm:inline">
+                        — {rec.courseName}
+                      </span>
+                    </td>
+                    <td className="p-3">{rec.topic}</td>
+                    <td className="p-3 text-secondary-foreground whitespace-nowrap">
+                      {rec.startTime}–{rec.endTime}
+                    </td>
+                    <td className="p-3">
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[rec.status]}`}>
+                        {STATUS_LABELS[rec.status]}
+                      </span>
+                    </td>
+                    <td className="p-3 text-xs text-secondary-foreground">{note ?? "—"}</td>
+                  </tr>
+                );
+              })}
+              {sortedOwn.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="p-6 text-center text-sm text-secondary-foreground">
+                    No records found
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
