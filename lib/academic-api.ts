@@ -86,8 +86,9 @@ export interface ApiExamResult {
 
 export const academicApi = {
     // ── Admission Documents Queue ──
+    // GET /api/admission/documents/queue
     getAdmissionQueue: (params?: {
-        status?: "PENDING_REVIEW" | "VERIFIED" | "REJECTED_DOCS";
+        status?: "PENDING_REVIEW" | "APPROVED" | "REJECTED";
         page?: number;
         size?: number;
     }) => {
@@ -100,10 +101,20 @@ export const academicApi = {
         );
     },
 
+    // PATCH /api/admission/documents/{documentId}/status
+    // Body: { status: "APPROVED" | "REJECTED" | "PENDING_REVIEW", feedback?: string }
+    updateDocumentStatus: (documentId: number, body: { status: string; feedback?: string }) =>
+        apiClient.patch<ApiAdmissionDocument>(
+            `/api/admission/documents/${documentId}/status`,
+            body
+        ),
+
     // ── Applicant Status ──
+    // PATCH /api/applicants/{id}/status?newState=...
     updateApplicantStatus: (id: number, newState: string) =>
         apiClient.patch(`/api/applicants/${id}/status?newState=${newState}`),
 
+    // GET /api/applicants/{id}/history
     getApplicantHistory: (id: number) =>
         apiClient.get<ApiApplicantHistory[]>(`/api/applicants/${id}/history`),
 
