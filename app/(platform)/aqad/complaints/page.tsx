@@ -11,7 +11,6 @@ import { StatusBadge } from "@/components/aqad/status-badge";
 import { PageHeader } from "@/components/platform/page-header";
 import { apiClient } from "@/lib/api-client";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface ApiComplaint {
   id: number;
@@ -39,7 +38,6 @@ interface PagedResponse<T> {
   last: boolean;
 }
 
-// ─── Constants ────────────────────────────────────────────────────────────────
 
 const STATUS_FILTERS = [
   { label: "All",        value: "all" },
@@ -68,7 +66,6 @@ function formatDate(ts: string) {
   });
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ComplaintsPage() {
   const [complaints, setComplaints]   = useState<ApiComplaint[]>([]);
@@ -78,7 +75,6 @@ export default function ComplaintsPage() {
   const [search, setSearch]           = useState("");
   const [selectedId, setSelectedId]   = useState<number | null>(null);
 
-  // Update status state
   const [updatingId, setUpdatingId]   = useState<number | null>(null);
   const [newStatus, setNewStatus]     = useState("");
   const [notes, setNotes]             = useState("");
