@@ -2,187 +2,118 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { use } from "react";
-import { ChevronRight } from "lucide-react";
+import {
+  ChevronRight, BookOpen, GraduationCap,
+  Globe, BarChart2, Tag, Hash,
+  Clock, CheckCircle2, XCircle, AlertTriangle,
+} from "lucide-react";
 import Link from "next/link";
+import { PageHeader } from "@/components/platform/page-header";
 import { SectionCard } from "@/components/aqad/section-card";
 import { StatusBadge } from "@/components/aqad/status-badge";
-import { Timeline } from "@/components/aqad/timeline";
-import { PageHeader } from "@/components/platform/page-header";
 import { apiClient } from "@/lib/api-client";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface ReviewChecklist {
-  learningOutcomesDefined: boolean;
-  assessmentAlignedWithOutcomes: boolean;
-  materialsUploaded: boolean;
-  gradingWeightsDefined: boolean;
-  attendancePolicyDefined: boolean;
-  academicIntegrityStatementPresent: boolean;
-}
-
-interface ReviewDecisionData {
+interface ApiCourse {
   id: number;
-  decisionType: "APPROVED" | "REJECTED" | "CONDITIONAL_APPROVAL";
-  reasonCode: string;
-  notes: string;
-  conditions: string[];
-  deadline: string;
-  adminOverride: boolean;
+  title: string;
+  description: string | null;
+  status: string;
+  language: string | null;
+  level: string | null;
+  version: number;
+  teacherName: string | null;
+  teacherId: number | null;
+  createdAt: string;
+  updatedAt: string;
+  category: string | null;
+  thumbnailUrl: string | null;
 }
 
-interface ApiReviewDetail {
+interface ApiReview {
   id: number;
   courseId: number;
   courseTitle: string;
-  reviewerId: number;
-  reviewerName: string;
+  reviewerId: number | null;
+  reviewerName: string | null;
   status: string;
-  checklist: ReviewChecklist;
+  checklist: {
+    learningOutcomesDefined: boolean;
+    assessmentAlignedWithOutcomes: boolean;
+    materialsUploaded: boolean;
+    gradingWeightsDefined: boolean;
+    attendancePolicyDefined: boolean;
+    academicIntegrityStatementPresent: boolean;
+  } | null;
   createdAt: string;
   closedAt: string | null;
-  decision: ReviewDecisionData | null;
+  decision: {
+    id: number;
+    decisionType: string;
+    reasonCode: string;
+    notes: string;
+    conditions: string[];
+    deadline: string;
+    adminOverride: boolean;
+  } | null;
 }
-
-interface ApiComment {
-  id: number;
-  reviewId: number;
-  authorId: number;
-  authorName: string;
-  lectureId: number | null;
-  commentText: string;
-  visibility: "INTERNAL" | "PUBLIC";
-  createdAt: string;
-}
-
-type DecisionType = "APPROVED" | "REJECTED" | "CONDITIONAL_APPROVAL";
 
 type Props = { params: Promise<{ courseId: string }> };
 
-// ─── Component ────────────────────────────────────────────────────────────────
+const STATUS_STYLES: Record<string, string> = {
+  DRAFT:      "bg-[#f0f0f0] text-[#666]",
+  IN_REVIEW:  "bg-[#fef9c3] text-[#854d0e]",
+  APPROVED:   "bg-[#dbeafe] text-[#1d4ed8]",
+  PUBLISHED:  "bg-[#dcfce7] text-[#166534]",
+  REJECTED:   "bg-[#fee2e2] text-[#991b1b]",
+  ARCHIVED:   "bg-[#f3f4f6] text-[#6b7280]",
+};
 
-export default function ReviewDetailPage({ params }: Props) {
-  const { courseId } = use(params);
-  const reviewId = courseId; // route param is actually reviewId
-
-  const [review, setReview]       = useState<ApiReviewDetail | null>(null);
-  const [comments, setComments]   = useState<ApiComment[]>([]);
-  const [loading, setLoading]     = useState(true);
-  const [error, setError]         = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"checklist" | "decision" | "comments">("checklist");
-
-  // Checklist state (local edits before submitting decision)
-  const [checklist, setChecklist] = useState<ReviewChecklist>({
-    learningOutcomesDefined: false,
-    assessmentAlignedWithOutcomes: false,
-    materialsUploaded: false,
-    gradingWeightsDefined: false,
-    attendancePolicyDefined: false,
-    academicIntegrityStatementPresent: false,
+function formatDate(ts: string) {
+  return new Date(ts).toLocaleDateString("en-US", {
+    month: "short", day: "numeric", year: "numeric",
   });
+}
 
-  // Decision state
-  const [decision, setDecision]         = useState<DecisionType | "">("");
-  const [reasonCode, setReasonCode]     = useState("");
-  const [decisionNotes, setDecisionNotes] = useState("");
-  const [conditions, setConditions]     = useState("");
-  const [deadline, setDeadline]         = useState("");
-  const [submitting, setSubmitting]     = useState(false);
+export default function AqadReviewCourseDetailPage({ params }: Props) {
+  const { courseId } = use(params);
 
-  // Comment state
-  const [commentText, setCommentText]   = useState("");
-  const [visibility, setVisibility]     = useState<"INTERNAL" | "PUBLIC">("INTERNAL");
-  const [addingComment, setAddingComment] = useState(false);
+  const [course, setCourse]           = useState<ApiCourse | null>(null);
+  const [review, setReview]           = useState<ApiReview | null>(null);
+  const [starting, setStarting]       = useState(false);
+  const [startError, setStartError]   = useState<string | null>(null);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState<string | null>(null);
 
-  // ── Fetch review detail ──
-  const fetchReview = useCallback(async () => {
+  const fetchCourse = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiClient.get<ApiReviewDetail>(
-          `/api/v1/aqad/reviews/${reviewId}`
-      );
-      setReview(data);
-      setChecklist(data.checklist);
+      const data = await apiClient.get<ApiCourse>(`/api/courses/${courseId}`);
+      setCourse(data);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to load review");
+      setError(err instanceof Error ? err.message : "Failed to load course");
     } finally {
       setLoading(false);
     }
-  }, [reviewId]);
+  }, [courseId]);
 
-  // ── Fetch comments ──
-  const fetchComments = useCallback(async () => {
+  useEffect(() => { fetchCourse(); }, [fetchCourse]);
+
+  const handleStartReview = async () => {
+    setStarting(true);
+    setStartError(null);
     try {
-      const data = await apiClient.get<ApiComment[]>(
-          `/api/v1/aqad/reviews/${reviewId}/comments`
+      const data = await apiClient.post<ApiReview>(
+          `/api/v1/aqad/courses/${courseId}/start-review`
       );
-      setComments(Array.isArray(data) ? data : []);
-    } catch {
-      // comments optional
-    }
-  }, [reviewId]);
-
-  useEffect(() => {
-    fetchReview();
-    fetchComments();
-  }, [fetchReview, fetchComments]);
-
-  // ── Submit decision ──
-  const handleSubmitDecision = async () => {
-    if (!decision) return;
-    setSubmitting(true);
-    try {
-      await apiClient.post(`/api/v1/aqad/reviews/${reviewId}/decisions`, {
-        decisionType: decision,
-        reasonCode: reasonCode || undefined,
-        notes: decisionNotes || undefined,
-        conditions: conditions ? conditions.split("\n").filter(Boolean) : [],
-        deadline: deadline || undefined,
-        checklist,
-      });
-      await fetchReview();
-      setActiveTab("checklist");
+      setReview(data);
+      window.location.href = `/aqad/review-queue`;
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Failed to submit decision");
+      setStartError(err instanceof Error ? err.message : "Failed to start review");
     } finally {
-      setSubmitting(false);
+      setStarting(false);
     }
   };
-
-  // ── Add comment ──
-  const handleAddComment = async () => {
-    if (!commentText.trim()) return;
-    setAddingComment(true);
-    try {
-      await apiClient.post(`/api/v1/aqad/reviews/${reviewId}/comments`, {
-        commentText,
-        lectureId: null,
-        visibility,
-      });
-      setCommentText("");
-      await fetchComments();
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Failed to add comment");
-    } finally {
-      setAddingComment(false);
-    }
-  };
-
-  const CHECKLIST_LABELS: Record<keyof ReviewChecklist, string> = {
-    learningOutcomesDefined:              "Learning Outcomes Defined",
-    assessmentAlignedWithOutcomes:        "Assessment Aligned with Outcomes",
-    materialsUploaded:                    "Materials Uploaded",
-    gradingWeightsDefined:                "Grading Weights Defined",
-    attendancePolicyDefined:              "Attendance Policy Defined",
-    academicIntegrityStatementPresent:    "Academic Integrity Statement Present",
-  };
-
-  const TABS = [
-    { id: "checklist" as const, label: "Checklist" },
-    { id: "decision"  as const, label: "Decision" },
-    { id: "comments"  as const, label: `Comments (${comments.length})` },
-  ];
 
   if (loading) {
     return (
@@ -194,324 +125,207 @@ export default function ReviewDetailPage({ params }: Props) {
     );
   }
 
-  if (error || !review) {
+  if (error || !course) {
     return (
         <div className="flex flex-col items-center justify-center py-20 gap-3">
-          <p className="text-sm text-red-500">{error ?? "Review not found"}</p>
-          <Link href="/aqad/review-queue" className="text-sm underline">
-            Back to Review Queue
+          <p className="text-sm text-red-500">{error ?? "Course not found"}</p>
+          <Link href="/aqad/review" className="text-sm underline">
+            Back to Review
           </Link>
         </div>
     );
   }
 
+  const canStartReview =
+      course.status === "IN_REVIEW" || course.status === "DRAFT";
+
+  const metaItems = [
+    course.teacherName && { icon: GraduationCap, label: "Teacher",  value: course.teacherName },
+    course.language    && { icon: Globe,          label: "Language", value: course.language },
+    course.level       && { icon: BarChart2,      label: "Level",    value: course.level.charAt(0) + course.level.slice(1).toLowerCase() },
+    course.category    && { icon: Tag,            label: "Category", value: course.category },
+    { icon: Hash, label: "Version", value: `v${course.version}` },
+  ].filter(Boolean) as { icon: React.ElementType; label: string; value: string }[];
+
   return (
       <div>
-        {/* Breadcrumb */}
         <div className="mb-4 flex items-center gap-2 text-sm text-secondary-foreground">
-          <Link href="/aqad/review-queue" className="hover:text-foreground">
-            Review Queue
+          <Link href="/aqad/review" className="hover:text-foreground transition-colors">
+            Course Review
           </Link>
           <ChevronRight className="h-4 w-4" />
-          <span>Review #{review.id}</span>
+          <span className="line-clamp-1">{course.title}</span>
         </div>
 
-        <PageHeader
-            title={review.courseTitle}
-            description={`Review #${review.id}`}
-        />
+        <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <PageHeader
+                title={course.title}
+                description={`Course #${course.id}`}
+            />
+          </div>
 
-        {/* Header info */}
-        <div className="mb-6 grid grid-cols-2 gap-3 rounded-lg border bg-secondary/30 p-4 md:grid-cols-4">
-          <div>
-            <p className="text-xs text-secondary-foreground">Reviewer</p>
-            <p className="text-sm font-medium">{review.reviewerName ?? "—"}</p>
-          </div>
-          <div>
-            <p className="text-xs text-secondary-foreground">Status</p>
-            <StatusBadge status={review.status} />
-          </div>
-          <div>
-            <p className="text-xs text-secondary-foreground">Created</p>
-            <p className="text-sm font-medium">
-              {new Date(review.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs text-secondary-foreground">Decision</p>
-            <p className="text-sm font-medium">
-              {review.decision?.decisionType ?? "Pending"}
-            </p>
+          <div className="flex items-center gap-3 shrink-0">
+          <span
+              className={`rounded-full px-3 py-1 text-sm font-medium ${
+                  STATUS_STYLES[course.status] ?? "bg-secondary text-foreground"
+              }`}
+          >
+            {course.status.replace("_", " ")}
+          </span>
+
+            {canStartReview && (
+                <button
+                    onClick={handleStartReview}
+                    disabled={starting}
+                    className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90 disabled:opacity-50 transition-opacity"
+                >
+                  {starting ? "Starting…" : "Start AQAD Review"}
+                </button>
+            )}
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="mb-6 flex gap-1 border-b">
-          {TABS.map((tab) => (
-              <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`px-4 py-2 text-sm font-medium transition-colors ${
-                      activeTab === tab.id
-                          ? "border-b-2 border-foreground text-foreground"
-                          : "text-secondary-foreground hover:text-foreground"
-                  }`}
-              >
-                {tab.label}
-              </button>
-          ))}
-        </div>
-
-        {/* ── Checklist Tab ── */}
-        {activeTab === "checklist" && (
-            <SectionCard title="Quality Checklist">
-              <div className="space-y-3">
-                {(Object.keys(checklist) as (keyof ReviewChecklist)[]).map((key) => (
-                    <label
-                        key={key}
-                        className="flex cursor-pointer items-center gap-3 rounded-lg border p-3 hover:bg-secondary/30"
-                    >
-                      <input
-                          type="checkbox"
-                          checked={checklist[key]}
-                          onChange={(e) =>
-                              setChecklist((prev) => ({ ...prev, [key]: e.target.checked }))
-                          }
-                          className="h-4 w-4 rounded"
-                          disabled={!!review.decision}
-                      />
-                      <span className="text-sm font-medium">
-                  {CHECKLIST_LABELS[key]}
-                </span>
-                      {checklist[key] ? (
-                          <span className="ml-auto rounded-full bg-[#dcfce7] px-2 py-0.5 text-xs text-[#166534]">
-                    Passed
-                  </span>
-                      ) : (
-                          <span className="ml-auto rounded-full bg-secondary px-2 py-0.5 text-xs text-secondary-foreground">
-                    Pending
-                  </span>
-                      )}
-                    </label>
-                ))}
-              </div>
-              <div className="mt-4 flex justify-end">
-                <p className="text-sm text-secondary-foreground">
-                  {Object.values(checklist).filter(Boolean).length} /{" "}
-                  {Object.keys(checklist).length} items passed
-                </p>
-              </div>
-            </SectionCard>
-        )}
-
-        {/* ── Decision Tab ── */}
-        {activeTab === "decision" && (
-            <div className="space-y-6">
-              {review.decision ? (
-                  <SectionCard title="Decision Submitted">
-                    <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
-                      <div>
-                        <p className="text-xs text-secondary-foreground">Decision</p>
-                        <p className="text-sm font-semibold">
-                          {review.decision.decisionType.replace("_", " ")}
-                        </p>
-                      </div>
-                      {review.decision.reasonCode && (
-                          <div>
-                            <p className="text-xs text-secondary-foreground">Reason Code</p>
-                            <p className="text-sm">{review.decision.reasonCode}</p>
-                          </div>
-                      )}
-                      {review.decision.deadline && (
-                          <div>
-                            <p className="text-xs text-secondary-foreground">Deadline</p>
-                            <p className="text-sm">
-                              {new Date(review.decision.deadline).toLocaleDateString()}
-                            </p>
-                          </div>
-                      )}
-                    </div>
-                    {review.decision.notes && (
-                        <div className="mt-4">
-                          <p className="text-xs text-secondary-foreground">Notes</p>
-                          <p className="text-sm">{review.decision.notes}</p>
-                        </div>
-                    )}
-                    {review.decision.conditions?.length > 0 && (
-                        <div className="mt-4">
-                          <p className="mb-2 text-xs text-secondary-foreground">Conditions</p>
-                          <ul className="space-y-1">
-                            {review.decision.conditions.map((c, i) => (
-                                <li key={i} className="flex items-start gap-2 text-sm">
-                                  <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-foreground" />
-                                  {c}
-                                </li>
-                            ))}
-                          </ul>
-                        </div>
-                    )}
-                  </SectionCard>
-              ) : (
-                  <SectionCard title="Submit Decision">
-                    <div className="space-y-4">
-                      {(["APPROVED", "CONDITIONAL_APPROVAL", "REJECTED"] as DecisionType[]).map((d) => (
-                          <label
-                              key={d}
-                              className={`flex cursor-pointer items-center gap-3 rounded-lg border p-4 transition-colors ${
-                                  decision === d ? "border-foreground bg-secondary" : "hover:bg-secondary/50"
-                              }`}
-                          >
-                            <input
-                                type="radio"
-                                name="decision"
-                                value={d}
-                                checked={decision === d}
-                                onChange={() => setDecision(d)}
-                            />
-                            <div>
-                              <p className="text-sm font-medium">
-                                {d === "CONDITIONAL_APPROVAL" ? "Conditional Approval" : d.charAt(0) + d.slice(1).toLowerCase()}
-                              </p>
-                              <p className="text-xs text-secondary-foreground">
-                                {d === "APPROVED" && "Course passes quality review."}
-                                {d === "CONDITIONAL_APPROVAL" && "Course may be published but must complete required changes."}
-                                {d === "REJECTED" && "Course does not meet standards. Must resubmit."}
-                              </p>
-                            </div>
-                          </label>
-                      ))}
-
-                      <div>
-                        <label className="mb-1 block text-xs font-medium">Reason Code</label>
-                        <input
-                            type="text"
-                            value={reasonCode}
-                            onChange={(e) => setReasonCode(e.target.value)}
-                            placeholder="e.g. INCOMPLETE_MATERIALS"
-                            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="mb-1 block text-xs font-medium">Notes</label>
-                        <textarea
-                            value={decisionNotes}
-                            onChange={(e) => setDecisionNotes(e.target.value)}
-                            placeholder="General notes about this review…"
-                            rows={3}
-                            className="w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none"
-                        />
-                      </div>
-
-                      {(decision === "REJECTED" || decision === "CONDITIONAL_APPROVAL") && (
-                          <>
-                            <div>
-                              <label className="mb-1 block text-xs font-medium">
-                                Conditions (one per line)
-                              </label>
-                              <textarea
-                                  value={conditions}
-                                  onChange={(e) => setConditions(e.target.value)}
-                                  placeholder="List conditions or required changes…"
-                                  rows={3}
-                                  className="w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none"
-                              />
-                            </div>
-                            <div>
-                              <label className="mb-1 block text-xs font-medium">Deadline</label>
-                              <input
-                                  type="date"
-                                  value={deadline}
-                                  onChange={(e) => setDeadline(e.target.value)}
-                                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none"
-                              />
-                            </div>
-                          </>
-                      )}
-
-                      <div className="flex justify-end gap-3">
-                        <button
-                            disabled={!decision || submitting}
-                            onClick={handleSubmitDecision}
-                            className="rounded-md bg-foreground px-4 py-2 text-sm text-background hover:opacity-90 disabled:opacity-50"
-                        >
-                          {submitting ? "Submitting…" : "Submit Decision"}
-                        </button>
-                      </div>
-                    </div>
-                  </SectionCard>
-              )}
+        {startError && (
+            <div className="mb-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              {startError}
             </div>
         )}
 
-        {/* ── Comments Tab ── */}
-        {activeTab === "comments" && (
-            <div className="space-y-4">
-              <SectionCard title="Add Comment">
-                <div className="space-y-3">
-              <textarea
-                  value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
-                  placeholder="Write a comment…"
-                  rows={3}
-                  className="w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none"
-              />
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <label className="text-xs font-medium">Visibility:</label>
-                      <select
-                          value={visibility}
-                          onChange={(e) => setVisibility(e.target.value as "INTERNAL" | "PUBLIC")}
-                          className="rounded-md border border-border bg-background px-2 py-1 text-xs focus:outline-none"
-                      >
-                        <option value="INTERNAL">Internal (AQAD only)</option>
-                        <option value="PUBLIC">Public (visible to teacher)</option>
-                      </select>
-                    </div>
-                    <button
-                        disabled={!commentText.trim() || addingComment}
-                        onClick={handleAddComment}
-                        className="rounded-md bg-foreground px-3 py-1.5 text-sm text-background hover:opacity-90 disabled:opacity-50"
-                    >
-                      {addingComment ? "Adding…" : "Add Comment"}
-                    </button>
-                  </div>
-                </div>
-              </SectionCard>
+        {course.status === "IN_REVIEW" && (
+            <div className="mb-4 flex items-center justify-between rounded-lg border border-yellow-200 bg-yellow-50 px-4 py-3">
+              <div className="flex items-center gap-2 text-sm text-yellow-800">
+                <Clock className="h-4 w-4 shrink-0" />
+                <span>This course is currently under AQAD review.</span>
+              </div>
+              <Link
+                  href="/aqad/review-queue"
+                  className="text-sm font-medium text-yellow-900 underline hover:no-underline"
+              >
+                View in Queue →
+              </Link>
+            </div>
+        )}
 
-              {comments.length === 0 ? (
-                  <p className="py-8 text-center text-sm text-secondary-foreground">
-                    No comments yet.
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className="space-y-6 lg:col-span-2">
+
+            <SectionCard title="Course Information">
+              {course.description ? (
+                  <p className="text-sm text-secondary-foreground leading-relaxed">
+                    {course.description}
                   </p>
               ) : (
-                  <div className="space-y-3">
-                    {comments.map((comment) => (
-                        <div key={comment.id} className="rounded-lg border p-4">
-                          <div className="mb-2 flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <p className="text-sm font-medium">{comment.authorName}</p>
-                              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                                  comment.visibility === "INTERNAL"
-                                      ? "bg-[#fef9c3] text-[#854d0e]"
-                                      : "bg-[#dcfce7] text-[#166534]"
-                              }`}>
-                        {comment.visibility}
-                      </span>
-                            </div>
-                            <p className="text-xs text-secondary-foreground">
-                              {new Date(comment.createdAt).toLocaleString("en-US", {
-                                month: "short", day: "numeric",
-                                hour: "2-digit", minute: "2-digit",
-                              })}
-                            </p>
-                          </div>
-                          <p className="text-sm">{comment.commentText}</p>
-                        </div>
-                    ))}
+                  <p className="text-sm italic text-secondary-foreground">
+                    No description provided.
+                  </p>
+              )}
+
+              {course.thumbnailUrl && (
+                  <div className="mt-4 overflow-hidden rounded-lg border">
+                    <img
+                        src={course.thumbnailUrl}
+                        alt={course.title}
+                        className="h-48 w-full object-cover"
+                    />
                   </div>
               )}
-            </div>
-        )}
+            </SectionCard>
+
+            <SectionCard title="AQAD Actions">
+              <div className="space-y-3">
+                {course.status === "IN_REVIEW" ? (
+                    <>
+                      <p className="text-sm text-secondary-foreground">
+                        This course is in the review queue. Go to the review queue to manage the full review process — checklist, decision, and comments.
+                      </p>
+                      <Link
+                          href="/aqad/review-queue"
+                          className="inline-flex items-center gap-2 rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90 transition-opacity"
+                      >
+                        <BookOpen className="h-4 w-4" />
+                        Open Review Queue
+                      </Link>
+                    </>
+                ) : course.status === "APPROVED" || course.status === "PUBLISHED" ? (
+                    <div className="flex items-center gap-2 text-sm text-[#166534]">
+                      <CheckCircle2 className="h-4 w-4" />
+                      This course has been approved and is ready to publish.
+                    </div>
+                ) : course.status === "REJECTED" ? (
+                    <div className="flex items-center gap-2 text-sm text-[#991b1b]">
+                      <XCircle className="h-4 w-4" />
+                      This course was rejected. The teacher must resubmit after corrections.
+                    </div>
+                ) : (
+                    <>
+                      <p className="text-sm text-secondary-foreground">
+                        Start the AQAD review process for this course. Once started, it will appear in the review queue where you can complete the checklist and submit a decision.
+                      </p>
+                      <button
+                          onClick={handleStartReview}
+                          disabled={starting}
+                          className="inline-flex items-center gap-2 rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90 disabled:opacity-50 transition-opacity"
+                      >
+                        <BookOpen className="h-4 w-4" />
+                        {starting ? "Starting Review…" : "Start AQAD Review"}
+                      </button>
+                      {startError && (
+                          <p className="text-sm text-red-500">{startError}</p>
+                      )}
+                    </>
+                )}
+              </div>
+            </SectionCard>
+
+          </div>
+
+          <div className="space-y-6">
+            <SectionCard title="Details">
+              <div className="space-y-3">
+                {metaItems.map(({ icon: Icon, label, value }) => (
+                    <div key={label} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2 text-secondary-foreground">
+                        <Icon className="h-4 w-4" />
+                        <span>{label}</span>
+                      </div>
+                      <span className="font-medium text-right">{value}</span>
+                    </div>
+                ))}
+                <div className="border-t border-border pt-3 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-secondary-foreground">Submitted</span>
+                    <span>{formatDate(course.createdAt)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-secondary-foreground">Last updated</span>
+                    <span>{formatDate(course.updatedAt)}</span>
+                  </div>
+                </div>
+              </div>
+            </SectionCard>
+
+            <SectionCard title="Quick Links">
+              <div className="space-y-2">
+                <Link
+                    href="/aqad/review-queue"
+                    className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm hover:bg-secondary transition-colors"
+                >
+                  <span>Review Queue</span>
+                  <ChevronRight className="h-4 w-4 text-secondary-foreground" />
+                </Link>
+                <Link
+                    href="/aqad/complaints"
+                    className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm hover:bg-secondary transition-colors"
+                >
+                  <span>Complaints</span>
+                  <ChevronRight className="h-4 w-4 text-secondary-foreground" />
+                </Link>
+              </div>
+            </SectionCard>
+          </div>
+        </div>
       </div>
   );
 }

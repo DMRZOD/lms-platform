@@ -10,7 +10,6 @@ export function PlatformShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-secondary">
-      {/* Mobile backdrop */}
       {sidebarOpen && (
         <div
           className="fixed inset-0 z-40 bg-foreground/50 lg:hidden"
@@ -21,7 +20,7 @@ export function PlatformShell({ children }: { children: React.ReactNode }) {
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       <div className="lg:pl-64">
-        <PlatformHeader onMenuClick={() => setSidebarOpen(true)} />
+        <PlatformHeader onMenuClickAction={() => setSidebarOpen(true)} />
         <main className="p-6">{children}</main>
       </div>
     </div>
