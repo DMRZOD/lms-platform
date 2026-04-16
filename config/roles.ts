@@ -159,7 +159,6 @@ export const roleConfigs: Record<string, RoleConfig> = {
     navItems: [
       { label: "Dashboard", href: "/aqad/dashboard", icon: LayoutDashboard },
       { label: "Review Queue", href: "/aqad/review-queue", icon: ClipboardList },
-      { label: "Review", href: "/aqad/review", icon: ClipboardList },
       { label: "Monitoring", href: "/aqad/monitoring", icon: Activity },
       { label: "Complaints", href: "/aqad/complaints", icon: MessageSquareWarning },
       { label: "Corrective Actions", href: "/aqad/corrective-actions", icon: CheckSquare },
